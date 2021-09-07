@@ -23,11 +23,6 @@ LOW_RES_CHANNELS = [4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 MED_RES_CHANNELS = [1, 3, 5]
 HI_RES_CHANNELS = [2]
 
-#inds = ((lons > lon_0) * (lons <= lon_1) *
-#        (lats > lat_0) * (lats <= lat_1))
-#i_start, i_end = np.where(inds)[0][[0, -1]]
-#j_start, j_end = np.where(inds)[1][[0, -1]]
-
 
 def find_goes_16_l1b_files(path, recursive=True):
     """
@@ -94,20 +89,30 @@ def get_channels(filenames):
     return list(channels)
 
 
-
-
-class Goes16File:
+class GOES16File:
     """
     Class to read GOES-16 L1b files.
 
-    One Goes16File object reads in data from all available channels files
-    for a given point in time..
+    One GOES16File object reads in data from all available channels files
+    for a given point in time.
     """
 
     @staticmethod
     def download(time,
                  cache=None,
                  no_cache=False):
+        """
+        Cached download of GOES files.
+
+        Args:
+            time: The time for which to download available GOES files.
+            cache: Folder to store downloaded files and to look for already
+                existing files.
+            no_cache: Disable cache.
+
+        Return:
+            GOES16File object
+        """
         time = pd.Timestamp(time).to_pydatetime()
         d_t = time.minute % 10
         start_time = time - timedelta(minutes=d_t + 5)
@@ -132,20 +137,21 @@ class Goes16File:
             if not path.exists() or no_cache:
                 provider.download_file(f, path)
             files.append(path)
-        return Goes16File.open_files(files)
+        return GOES16File(files)
 
     @staticmethod
     def open_files(files):
         """
-        Open all available GOES-16 L1b at a given path.
+        Combine files into GOES16File corresponding to discrete start
+        times.
+
 
         Args:
-            path: Folder in which to look for GOES-16 files. Search is
-                performed recursively.
+            files: A list of GOES 16 L1b files.
 
         Return:
-            List of 'Goes16File' objects for the time points that were found
-            in the provided directory.
+            One 'GOES16File' object for each separate start time found in the
+            list of files.
         """
         start_times = get_start_times(files)
         gpm_files = []
@@ -153,7 +159,7 @@ class Goes16File:
             time_s = time.strftime("%Y%j%H%M%S")
             pattern = re.compile(f"OR_ABI-L1b-RadF-[\w_]*s{time_s}[\w_]*.nc")
             channel_files = [f for f in files if pattern.match(f.name)]
-            gpm_files.append(Goes16File(channel_files))
+            gpm_files.append(GOES16File(channel_files))
         return gpm_files
 
     @staticmethod
@@ -166,7 +172,7 @@ class Goes16File:
                 performed recursively.
 
         Return:
-            List of 'Goes16File' objects for the time points that were found
+            List of 'GOES16File' objects for the time points that were found
             in the provided directory.
         """
         start_times = find_start_times(path)
@@ -177,7 +183,7 @@ class Goes16File:
             channel_files = list(
                 Path(path).glob(f"**/{pattern}")
             )
-            files.append(Goes16File(channel_files))
+            files.append(GOES16File(channel_files))
         return files
 
     def __init__(self, channel_files):
@@ -189,4 +195,4 @@ class Goes16File:
 
 
     def __repr__(self):
-        return f"Goes16File(channels={self.channels})"
+        return f"GOES16File(channels={self.channels})"
