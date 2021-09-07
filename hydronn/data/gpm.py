@@ -20,8 +20,19 @@ from pansat.download.providers.ges_disc import GesdiscProvider
 GPM_FILES = open(Path(__file__).parent / "gpm_files.txt").readlines()
 GPM_FILES = [name.strip() for name in GPM_FILES]
 
-def get_gpm_files(year, month):
-    pass
+def get_gpm_files(year, day):
+    """
+    Return list of GPM files for given year and day of month.
+
+    Args:
+        year: The year.
+        day: The day of the month, i.e. in [1, 31].
+
+    Return:
+        List containing all GPM CMB files over Brazil in the time range
+        between December 2017 and September 2021.
+    """
+    return GPM_FILES_SORTED.get((year, day), [])
 
 
 def extract_scenes(dataset, scans_per_scene):

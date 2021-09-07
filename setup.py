@@ -15,6 +15,9 @@ setup(
     author="Simon Pfreundschuh",
     author_email="simon.pfreundschuh@chalmers.se",
     install_requires=["numpy", "xarray", "torch"],
+    entry_points = {
+        'console_scripts': ['hydronn=hydronn.bin:hydronn'],
+    },
     packages=["hydronn"],
     python_requires=">=3.6",
     project_urls={
