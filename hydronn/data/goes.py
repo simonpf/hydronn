@@ -127,11 +127,17 @@ class GOES16File:
             dest = Path(cache)
 
         dest.mkdir(parents=True, exist_ok=True)
-        filenames = provider.get_files_in_range(
-            start_time,
-            end_time,
-            start_inclusive=False
-        )
+
+        try:
+            filenames = provider.get_files_in_range(
+                start_time,
+                end_time,
+                start_inclusive=False
+            )
+        except Exception:
+            return None
+        if not filenames:
+            return None
         for f in filenames:
             path = dest / f
             if not path.exists() or no_cache:
@@ -191,7 +197,6 @@ class GOES16File:
         self.start_time = min(start_times)
         self.channels = get_channels(channel_files)
         self.scene = Scene(map(str, channel_files), reader="abi_l1b")
-        print("CHANNELS:", self.channels)
 
 
     def __repr__(self):

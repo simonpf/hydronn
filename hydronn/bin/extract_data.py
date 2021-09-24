@@ -35,7 +35,7 @@ def add_parser(subparsers):
         help='The year for which to extract co-locations.'
     )
     parser.add_argument(
-        'day', metavar='day', type=int, nargs="*",
+        'days', metavar='day_1, day_2, ...', type=int, nargs="*",
         help='The day for which to extract co-locations.'
     )
     parser.add_argument(
@@ -101,12 +101,15 @@ def run(args):
         for t, f in zip(track(tasks, description=f"{year}/{d}"),
                         gpm_files):
             try:
-                datasets.append(t.result())
+                dataset = t.result()
+                if dataset is not None:
+                    datasets.append(dataset)
             except Exception as e:
                 LOGGER.warning(
                     "Processing of  failed with the following "
                     "exception:", f, e
                 )
-        output = destination / "goes_gpm_{year}_{day:02}.nc"
-        dataset = xr.concat(datasets, "scenes")
-        dataset.to_netcdf(output)
+        if datasets:
+            output = destination / f"goes_gpm_{year}_{d:02}.nc"
+            dataset = xr.concat(datasets, "scenes", coords="all", join="override")
+            dataset.to_netcdf(output)

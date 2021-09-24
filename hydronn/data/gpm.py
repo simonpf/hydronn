@@ -105,7 +105,7 @@ class GPMCMBFile:
         """
         with File(str(self.filename), "r") as data:
 
-            data = data['MS']
+            data = data['NS']
             latitude = data["Latitude"][:]
             longitude = data["Longitude"][:]
 
