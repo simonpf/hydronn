@@ -6,7 +6,10 @@ hydronn.colocations
 This module implements the functions used to co-locate GPM and GOES
 observations.
 """
+import logging
+
 import numpy as np
+import pandas as pd
 import pyresample
 from pyresample.geometry import SwathDefinition
 from pyresample import kd_tree
@@ -19,6 +22,10 @@ from hydronn.data.goes import (GOES16File,
                                MED_RES_CHANNELS,
                                HI_RES_CHANNELS)
 
+
+LOGGER = logging.getLogger(__name__)
+
+
 def add_channels(dataset):
     """
     Add missing channels to dataset.
@@ -29,7 +36,7 @@ def add_channels(dataset):
     Return:
         The same dataset with missing channels filled with NAN.
     """
-    for i in range(1, 16):
+    for i in range(1, 17):
         v = f"C{i:02}"
         if v not in dataset.variables:
             if i in LOW_RES_CHANNELS:
@@ -44,6 +51,19 @@ def add_channels(dataset):
                 data = np.zeros((1024, 1024), dtype=np.float32)
                 data[:] = np.nan
                 dataset[v] = (("x_500", "y_500"), data)
+
+    for v in ["x_500_", "y_500_"]:
+        if v not in dataset.coords:
+            dataset[v] = ((v[:-1],), np.nan * np.ones(1024))
+
+    for v in ["x_1000_", "y_1000_"]:
+        if v not in dataset.coords:
+            dataset[v] = ((v[:-1],), np.nan * np.ones(512))
+
+    for v in ["x_", "y_"]:
+        if v not in dataset.coords:
+            dataset[v] = ((v[:-1],), np.nan * np.ones(256))
+
     return dataset
 
 
@@ -61,6 +81,8 @@ def extract_colocations(gpm_file,
         GPMCMB files.
     """
     scenes = []
+    gpm_times = []
+    goes_times = []
     for s in gpm_file.extract_scenes(ROI, 110):
         lat_0 = s.latitude.min().item()
         lat_1 = s.latitude.max().item()
@@ -79,11 +101,18 @@ def extract_colocations(gpm_file,
         if goes_file is None:
             continue
 
-        scene = goes_file.scene
+        dt = pd.Timestamp(t).to_pydatetime() - goes_file.start_time
+        if dt.total_seconds() > 300:
+            LOGGER.error("Time delta between GPM and GOES larger than 5 minutes.")
+            continue
 
+        scene = goes_file.scene
         if all([c < 6 for c in goes_file.channels]):
             continue
         channel = [c for c in goes_file.channels if c >= 6][0]
+
+        gpm_times.append(t)
+        goes_times.append(pd.Timestamp(t).to_numpy())
 
         datasets = [f"C{c:02}" for c in range(1, 17)] + ["true_color"]
         scene.load(datasets)
@@ -164,10 +193,14 @@ def extract_colocations(gpm_file,
                 "x": slice(d_x // 2 + d_x % 2, x_size - d_x // 2),
                 "y": slice(d_y // 2 + d_y % 2, y_size - d_y // 2)
             }].rename({"x": "x_500", "y": "y_500"})
-            datasets.append(data_hr.reset_index("x_500", "y_500"))
+            datasets.append(data_hr.reset_index(["x_500", "y_500"]))
 
         dataset = add_channels(xr.merge(datasets))
         scenes.append(dataset)
     if not scenes:
         return None
-    return xr.concat(scenes, dim="scenes", coords="all", join="override").drop("crs")
+    coords = ["x_500_", "y_500_", "x_1000_", "y_1000_", "x_", "y_"]
+    dataset = xr.concat(scenes, dim="scenes", coords=coords, join="override").drop("crs")
+    dataset["time_goes"] = ("scenes", goes_times)
+    dataset["time_gpm"] = ("scenes", gpm_times)
+    return dataset

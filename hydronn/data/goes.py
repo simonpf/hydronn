@@ -114,8 +114,7 @@ class GOES16File:
             GOES16File object
         """
         time = pd.Timestamp(time).to_pydatetime()
-        d_t = time.minute % 10
-        start_time = time - timedelta(minutes=d_t + 5)
+        start_time = time - timedelta(minutes=5)
         end_time = start_time + timedelta(minutes=10)
 
         provider = GOESAWSProvider(goes_16_l1b_radiances_all_full_disk)
@@ -195,6 +194,9 @@ class GOES16File:
     def __init__(self, channel_files):
         start_times = get_start_times(channel_files)
         self.start_time = min(start_times)
+        tds = [(t - self.start_time).total_seconds() for t in start_times]
+        if max(tds) > 300:
+            raise ValueError("Provided channel files have inconsistent start times.")
         self.channels = get_channels(channel_files)
         self.scene = Scene(map(str, channel_files), reader="abi_l1b")
 
