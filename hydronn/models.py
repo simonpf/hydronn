@@ -74,23 +74,35 @@ class Hydronn(nn.Module):
         if isinstance(n_blocks, int):
             n_blocks = [n_blocks] * 7
 
+        n_features_hi_res = n_features_body // 16
+        n_features_med_res = n_features_body // 4
 
         self.hi_res_in = nn.Sequential(
-            SymmetricPadding(1),
-            nn.Conv2d(1, n_features_body, 3),
-            XceptionBlock(n_features_body, n_features_body, downsample=True),
-            *([XceptionBlock(n_features_body, n_features_body)]
-              * (n_blocks[0] - 1))
+            XceptionBlock(
+                1,
+                n_features_hi_res,
+                downsample=True
+            ),
+            *([XceptionBlock(
+                n_features_hi_res,
+                n_features_hi_res
+            )] * (n_blocks[0] - 1))
         )
 
         self.med_res_in = nn.Sequential(
-            XceptionBlock(n_features_body + 3, n_features_body, downsample=True),
-            *([XceptionBlock(n_features_body, n_features_body)]
-              * (n_blocks[1] - 1))
+            XceptionBlock(
+                n_features_hi_res + 3,
+                n_features_med_res,
+                downsample=True
+            ),
+            *([XceptionBlock(
+                n_features_med_res,
+                n_features_med_res,
+            )] * (n_blocks[1] - 1))
         )
 
         self.low_res_in = nn.Sequential(
-            XceptionBlock(n_features_body + 12, n_features_body, downsample=False),
+            XceptionBlock(n_features_med_res + 12, n_features_body, downsample=False),
         )
 
         self.down_block_2 = DownsamplingBlock(n_features_body, n_blocks[0])
@@ -105,7 +117,7 @@ class Hydronn(nn.Module):
         self.up_block_2 = UpsamplingBlock(n_features_body)
         self.up_block = UpsamplingBlock(n_features_body)
 
-        n_inputs = 2 * n_features_body
+        n_inputs = n_features_body + n_features_med_res + 12
         self.head = MLPHead(n_inputs,
                             n_features_head,
                             n_outputs,
@@ -137,5 +149,5 @@ class Hydronn(nn.Module):
         x_2_u = self.up_block_2(x_4_u, x_2)
         x_u = self.up_block(x_2_u, x_low)
 
-        x = torch.cat([x_u, x_med], 1)
+        x = torch.cat([x_u, x_med, x[0]], 1)
         return self.head(x)
