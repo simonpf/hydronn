@@ -58,7 +58,6 @@ def add_parser(subparsers):
         "--n_features_body",
         metavar='n',
         type=int,
-        nargs=1,
         default=256,
         help=("The number of features in the body of the network.")
     )
@@ -74,7 +73,6 @@ def add_parser(subparsers):
         '--n_features_head',
         metavar='n',
         type=int,
-        nargs=1,
         default=128,
         help="The number of features in the head of the network."
     )
@@ -82,7 +80,7 @@ def add_parser(subparsers):
         '--n_blocks',
         metavar='N',
         type=int,
-        nargs=1,
+        nargs="*",
         default=2,
         help="The number of block in the stages of the encoder."
     )
@@ -172,6 +170,10 @@ def run(args):
             f"_{n_features_head}.pckl"
         )
         output = output / network_name
+
+    if isinstance(n_blocks, list):
+        if len(n_blocks) < 7:
+            n_blocks = n_blocks * 7
 
     training_data = args.training_data
     validation_data = args.validation_data
