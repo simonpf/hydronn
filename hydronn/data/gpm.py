@@ -10,7 +10,6 @@ from datetime import datetime
 from pathlib import Path
 from urllib.parse import urlparse
 
-from h5py import File
 import numpy as np
 import pandas as pd
 import xarray as xr
@@ -103,6 +102,7 @@ class GPMCMBFile:
                  corners. If given, only scans containing at least one pixel
                  within the given bounding box will be returned.
         """
+        from h5py import File
         with File(str(self.filename), "r") as data:
 
             data = data['NS']

@@ -15,9 +15,6 @@ from tempfile import TemporaryDirectory
 from rich.progress import track
 import xarray as xr
 
-from hydronn.data.gpm import GPMCMBFile, get_gpm_files
-from hydronn.colocations import extract_colocations
-
 os.environ["OMP_NUM_THREADS"] = "1"
 LOGGER = logging.getLogger(__name__)
 
@@ -69,6 +66,9 @@ def run(args):
     Args:
         args: The namespace object provided by the top-level parser.
     """
+    from hydronn.data.gpm import GPMCMBFile, get_gpm_files
+    from hydronn.colocations import extract_colocations
+
     year = args.year
     days = args.days
 
