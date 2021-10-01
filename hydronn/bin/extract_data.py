@@ -106,8 +106,8 @@ def run(args):
                     datasets.append(dataset)
             except Exception as e:
                 LOGGER.warning(
-                    "Processing of  failed with the following "
-                    "exception:", f, e
+                    "Processing of %s  failed with the following "
+                    "exception:\n %s", f, e
                 )
         if datasets:
             output = destination / f"goes_gpm_{year}_{d:02}.nc"
