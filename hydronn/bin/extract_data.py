@@ -52,6 +52,8 @@ def process_file(gpm_file):
     Process a single gpm_file and return extracted co-locations as
     ``xarray.Dataset``.
     """
+    from hydronn.data.gpm import GPMCMBFile
+    from hydronn.colocations import extract_colocations
     with TemporaryDirectory() as tmp:
         gpm_file = GPMCMBFile.download(gpm_file, Path(tmp))
         dataset = extract_colocations(gpm_file, tmp)
@@ -66,9 +68,7 @@ def run(args):
     Args:
         args: The namespace object provided by the top-level parser.
     """
-    from hydronn.data.gpm import GPMCMBFile, get_gpm_files
-    from hydronn.colocations import extract_colocations
-
+    from hydronn.data.gpm import get_gpm_files
     year = args.year
     days = args.days
 
