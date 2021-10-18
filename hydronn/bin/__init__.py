@@ -15,6 +15,7 @@ def hydronn():
     any of the available sub-commands.
     """
     from hydronn.bin import extract_data
+    from hydronn.bin import extract_retrieval_data
     from hydronn.bin import train
 
     description = ("HYDRONN: A NRT precipitation retrieval for Brazil.")
@@ -23,6 +24,7 @@ def hydronn():
     subparsers = parser.add_subparsers(help='Sub-commands')
 
     extract_data.add_parser(subparsers)
+    extract_retrieval_data.add_parser(subparsers)
     train.add_parser(subparsers)
 
     if len(sys.argv) == 1:

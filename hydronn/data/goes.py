@@ -213,29 +213,34 @@ class GOES16File:
         inputs = {}
         for c in LOW_RES_CHANNELS:
             channel_name = f"C{c:02}"
-            if channel_name in self.scene.all_dataset_names():
-                self.scene.load([f"C{c:02}"])
-                x = self.scene[f"C{c:02}"][ROW_START:ROW_END, COL_START:COL_END]
-                x = x.load().data.astype(np.float32)
+            if channel_name in self.scene.available_dataset_names():
+                self.scene.load([channel_name])
+                x = self.scene[channel_name][ROW_START:ROW_END, COL_START:COL_END]
+                x = x.load()
+                x.close()
+                x = x.data.astype(np.float32)
                 inputs[c] = x
 
         for c in MED_RES_CHANNELS:
             channel_name = f"C{c:02}"
-            if channel_name in self.scene.all_dataset_names():
-                self.scene.load([f"C{c:02}"])
-                x = self.scene[f"C{c:02}"]
+            if channel_name in self.scene.available_dataset_names():
+                self.scene.load([channel_name])
+                x = self.scene[channel_name]
                 x = x[2 * ROW_START: 2 * ROW_END, 2 * COL_START: 2 * COL_END]
-                x = x.load().data.astype(np.float32)
+                x = x.load()
+                x.close()
+                x = x.data.astype(np.float32)
                 inputs[c] = x
 
-        hi_res = {}
         for c in HI_RES_CHANNELS:
             channel_name = f"C{c:02}"
-            if channel_name in self.scene.all_dataset_names():
-                self.scene.load([f"C{c:02}"])
-                x = self.scene[f"C{c:02}"]
+            if channel_name in self.scene.available_dataset_names():
+                self.scene.load([channel_name])
+                x = self.scene[channel_name]
                 x = x[4 * ROW_START: 4 * ROW_END, 4 * COL_START: 4 * COL_END]
-                x = x.load().data.astype(np.float32)
+                x = x.load()
+                x.close()
+                x = x.data.astype(np.float32)
                 inputs[c] = x
         return inputs
 
