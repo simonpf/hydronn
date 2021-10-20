@@ -272,6 +272,7 @@ class GOES16File:
             low_res.append(x)
         low_res = np.stack(low_res, axis=-1)[np.newaxis]
 
+        med_res = []
         for c in MED_RES_CHANNELS:
             channel_name = f"C{c:02}"
             if channel_name in inputs:
@@ -281,6 +282,7 @@ class GOES16File:
             med_res.append(x)
         med_res = np.stack(med_res, axis=-1)[np.newaxis]
 
+        hi_res = []
         for c in HI_RES_CHANNELS:
             channel_name = f"C{c:02}"
             if channel_name in inputs:
@@ -292,8 +294,8 @@ class GOES16File:
 
         if normalizer is not None:
             low_res = normalizer[0](low_res[np.newaxis])
-            med_res = normalizer[0](med_res[np.newaxis])
-            hi_res = normalizer[0](hi_res[np.newaxis])
+            med_res = normalizer[1](med_res[np.newaxis])
+            hi_res = normalizer[2](hi_res[np.newaxis])
 
         return (
             torch.tensor(low_res),
