@@ -13,6 +13,8 @@ import xarray as xr
 
 from quantnn.normalizer import MinMaxNormalizer
 
+from hydronn.utils import decompress_and_load
+
 
 class HydronnDataset:
     """
@@ -100,19 +102,20 @@ class HydronnDataset:
         Also augments the training samples if the objects 'augment'
         attribute is set to 'True'.
         """
-        with xr.open_dataset(self.filename) as data:
-            hi_res = data["C02"].data[:, np.newaxis].astype(np.float32)
-            med_res = np.stack([
-                data["C01"].data.astype(np.float32),
-                data["C03"].data.astype(np.float32),
-                data["C05"].data.astype(np.float32),
-                ], axis=1)
-            low_res = np.stack([
-                data[f"C{i:02}"].astype(np.float32)
-                for i in [4] + list(range(6, 17))
+        data = decompress_and_load(self.filename)
+        hi_res = data["C02"].data[:, np.newaxis].astype(np.float32)
+        med_res = np.stack([
+            data["C01"].data.astype(np.float32),
+            data["C03"].data.astype(np.float32),
+            data["C05"].data.astype(np.float32),
             ], axis=1)
-            surface_precip = data.surface_precip.data.astype(np.float32)
-            surface_precip = np.nan_to_num(surface_precip, nan=-1)
+        low_res = np.stack([
+            data[f"C{i:02}"].astype(np.float32)
+            for i in [4] + list(range(6, 17))
+        ], axis=1)
+        surface_precip = data.surface_precip.data.astype(np.float32)
+        surface_precip = np.nan_to_num(surface_precip, nan=-1)
+        data.close()
 
         self.hi_res = hi_res
         self.med_res = med_res

@@ -12,13 +12,33 @@ from datetime import (datetime, timedelta)
 import logging
 import os
 from pathlib import Path
-from tempfile import TemporaryDirectory
+import shutil
+import subprocess
+from tempfile import TemporaryDirectory, mkdtemp
 
 from rich.progress import track
 import xarray as xr
 
 os.environ["OMP_NUM_THREADS"] = "1"
 LOGGER = logging.getLogger(__name__)
+
+
+def save_and_compress(data, filename):
+    """
+    Save 'xarray.Dataset' to file and compress.
+
+    Note: The suffix '.gz' will be added to the filename by
+    gzip so it should not be added to the filename.
+
+    Args:
+        data: The 'xarray.Dataset' to save.
+        filename: The filename to store the file to.
+
+
+    """
+    with TemporaryDirectory as tmp:
+        xr.to_netcdf(filename)
+        subprocess.run(["gzip", filename], check=True)
 
 
 def add_parser(subparsers):
@@ -34,7 +54,7 @@ def add_parser(subparsers):
         help='The year for which to extract inputs.'
     )
     parser.add_argument(
-        'month', metavar='year', type=int,
+        'month', metavar='month', type=int,
         help='The month for which to extract inputs.'
     )
     parser.add_argument(
@@ -105,28 +125,33 @@ def process_hour(year, month, day, hour):
         goes_16_l1b_radiances_all_full_disk
     )
     from hydronn.data.goes import GOES16File
-    with TemporaryDirectory() as tmp:
-        tmp = Path(tmp)
 
-        start_time = datetime(year, month, day, hour)
-        end_time = start_time + timedelta(hours=1)
+    tmp = mkdtemp()
+    tmp = Path(tmp)
 
-        # Download files
-        files = []
-        provider = GOESAWSProvider(goes_16_l1b_radiances_all_full_disk)
-        filenames = provider.get_files_in_range(
-            start_time,
-            end_time,
-            start_inclusive=False
-        )
-        for f in filenames:
-            path = tmp / f
-            if not path.exists():
-                provider.download_file(f, path)
-            files.append(path)
+    start_time = datetime(year, month, day, hour)
+    end_time = start_time + timedelta(hours=1)
 
-        goes_files = GOES16File.open_files(files)
-        datasets = add_channels([f.get_input_data() for f in goes_files])
+    # Download files
+    files = []
+    provider = GOESAWSProvider(goes_16_l1b_radiances_all_full_disk)
+    filenames = provider.get_files_in_range(
+        start_time,
+        end_time,
+        start_inclusive=False
+    )
+    for f in filenames:
+        path = tmp / f
+        if not path.exists():
+            provider.download_file(f, path)
+        files.append(path)
+
+    goes_files = GOES16File.open_files(files)
+    datasets = add_channels([f.get_input_data() for f in goes_files])
+
+    # Make sure temporary directory is cleaned up.
+    shutil.rmtree(tmp, ignore_errors=True)
+
     return xr.concat(datasets, dim="time")
 
 
@@ -151,7 +176,8 @@ def run(args):
     pool = ThreadPoolExecutor(max_workers=args.n_processes)
     for d in days:
         tasks = []
-        hours = list(range(17, 24))
+        hours = list(range(0, 13))
+        hours = [11, 12, 16]
         for h in hours:
             tasks.append(pool.submit(process_hour, year, month, d, h))
 
@@ -164,6 +190,6 @@ def run(args):
                 data.to_netcdf(destination / filename)
             except Exception as e:
                 LOGGER.warning(
-                    "Processing of %s  failed with the following "
-                    "exception:\n %s", e
+                    "Processing of hour %s  failed with the following "
+                    "exception:\n %s", h, e
                 )

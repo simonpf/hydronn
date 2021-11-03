@@ -104,7 +104,6 @@ class Retrieval:
         input_data = InputFile(input_file,
                                self.normalizer,
                                1)
-        n = input_data.data.time.size
 
         y_pred_naive = None
         y_mean_naive = None
@@ -115,7 +114,9 @@ class Retrieval:
 
         quantiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]
 
+        n = len(input_data)
         bins = torch.Tensor(self.model.bins)
+        bins_acc = (1 / n) * bins
 
         for i in range(len(input_data)):
             x = input_data[i]
@@ -129,11 +130,11 @@ class Retrieval:
 
                 if y_pred_naive is None:
                     y_pred_naive = (1 / n) * y_pred
-                    y_pred_indep = (1 / n) * y_pred
+                    y_pred_indep = y_pred
                 else:
                     y_pred_naive = y_pred_naive + (1 / n) * y_pred
                     y_pred_indep = qd.add(
-                        y_pred_indep, bins, y_pred, (1 / n) * bins, bins
+                        y_pred_indep, bins, y_pred, bins, bins
                     )
 
         sample_naive = qd.sample_posterior(
@@ -147,13 +148,13 @@ class Retrieval:
         ).cpu().numpy()
 
         sample_indep = qd.sample_posterior(
-            y_pred_indep, bins
+            y_pred_indep, bins_acc
         ).cpu().numpy()[:, 0]
         quantiles_indep = qd.posterior_quantiles(
-            y_pred_naive, bins, quantiles
+            y_pred_indep, bins_acc, quantiles
         ).cpu().numpy().transpose([0, 2, 3, 1])
         mean_indep = qd.posterior_mean(
-            y_pred_naive, bins
+            y_pred_indep, bins_acc
         ).cpu().numpy()
 
         dims = ("time", "x", "y")
