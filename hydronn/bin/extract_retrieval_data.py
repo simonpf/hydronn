@@ -23,27 +23,9 @@ os.environ["OMP_NUM_THREADS"] = "1"
 LOGGER = logging.getLogger(__name__)
 
 
-def save_and_compress(data, filename):
-    """
-    Save 'xarray.Dataset' to file and compress.
-
-    Note: The suffix '.gz' will be added to the filename by
-    gzip so it should not be added to the filename.
-
-    Args:
-        data: The 'xarray.Dataset' to save.
-        filename: The filename to store the file to.
-
-
-    """
-    with TemporaryDirectory as tmp:
-        xr.to_netcdf(filename)
-        subprocess.run(["gzip", filename], check=True)
-
-
 def add_parser(subparsers):
     """
-    Add parser for 'extract_data' command to top-level CLI.
+    Add parser for 'extract_retrieval_data' command to top-level CLI.
     """
     parser = subparsers.add_parser(
             'extract_retrieval_data',
@@ -155,6 +137,15 @@ def process_hour(year, month, day, hour):
     return xr.concat(datasets, dim="time")
 
 
+def save_data(data, filename):
+    """
+    Helper function to load compression and saving of dataset off to another
+    process.
+    """
+    from hydronn.utils import save_and_compress
+    save_and_compress(data, filename)
+
+
 def run(args):
     """
     This function implements the actual execution of the co-location
@@ -174,6 +165,8 @@ def run(args):
         destination.mkdir(parents=True)
 
     pool = ThreadPoolExecutor(max_workers=args.n_processes)
+    save_pool = ProcessPoolExecutor(max_workers=1)
+
     for d in days:
         tasks = []
         hours = list(range(0, 13))
@@ -187,7 +180,7 @@ def run(args):
                 filename = (f"hydronn_input_{year:04}_{month:02}"
                             f"_{d:02}_{h:02}.nc")
                 print("SAVING : ", str(destination / filename))
-                data.to_netcdf(destination / filename)
+                save_pool.submit(save_data, data, destination / filename)
             except Exception as e:
                 LOGGER.warning(
                     "Processing of hour %s  failed with the following "

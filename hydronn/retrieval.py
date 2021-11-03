@@ -3,7 +3,6 @@ hydronn.retrieval
 =================
 
 Functionality for running the hydronn retrieval.
-
 """
 import numpy as np
 import xarray as xr
@@ -19,17 +18,41 @@ from hydronn.data.goes import (LOW_RES_CHANNELS,
                                COL_START,
                                COL_END)
 
+
 class InputFile:
+    """
+    Interface class to load the retrieval input data from the NetCDF files
+    used to store the observations.
+    """
     def __init__(self,
                  filename,
                  normalizer,
                  batch_size=-1):
+        """
+        Args:
+            filename: Path to the NetCDF file containing the data.
+            normalizer: A normalizer object to use to normalize the
+                inputs.
+            batch_size: How many observations to combine to a single input.
+        """
         self.data = xr.load_dataset(filename).sortby("time")
         self.normalizer = normalizer
         self.batch_size = batch_size
 
-    def get_input_data(self, t_start, t_end):
 
+    def get_input_data(self, t_start, t_end):
+        """
+        Get input samples for a range of time indices.
+
+        Args:
+            t_start: The starting index of the range of time indices.
+            t_end: The next index from the last value in the range of
+                time indices.
+
+        Return:
+            A 'torch.Tensor' containing the input data for the specified
+            range of t indices.
+        """
         m = ROW_END - ROW_START
         n = COL_END - COL_START
         t = t_start - t_end
@@ -75,6 +98,7 @@ class InputFile:
         )
 
     def __len__(self):
+        """The number of batches in the file."""
         if self.batch_size < 0:
             return 1
 
@@ -82,6 +106,7 @@ class InputFile:
         return n // self.batch_size + n % self.batch_size
 
     def __getitem__(self, i):
+        """Return a given batch."""
         if self.batch_size < 0:
             return self.get_input_data(0, self.data.time.size)
         else:
@@ -91,16 +116,31 @@ class InputFile:
 
 
 class Retrieval:
-
+    """
+    Processor class to run the retrieval for a list of input files.
+    """
     def __init__(self,
                  input_files,
                  model,
                  normalizer):
+        """
+        Args:
+            input_files: The list of input files for which to run the
+                retrieval.
+            model: The model to use for the retrieval.
+            normalizer: The normalizer object to use to normalize the
+                inputs.
+        """
         self.input_files = input_files
         self.model = model
         self.normalizer = normalizer
 
-    def run_file(self, input_file):
+    def _run_file(self, input_file):
+        """
+        Run retrieval for a single input files.
+        """
+
+
         input_data = InputFile(input_file,
                                self.normalizer,
                                1)
@@ -174,15 +214,10 @@ class Retrieval:
         return results
 
     def run(self):
+        """
+        Run retrieval and return results as 'xarray.Dataset'.
+        """
         results = []
         for f in self.input_files:
-            results.append(self.run_file(f))
+            results.append(self._run_file(f))
         return xr.concat(results, "time")
-
-
-
-
-
-
-
-
