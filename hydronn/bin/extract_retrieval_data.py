@@ -7,7 +7,7 @@ This module implements the command line application to download the
 retrieval input for a given date range.
 """
 from calendar import monthrange
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ThreadPoolExecutor
 from datetime import (datetime, timedelta)
 import logging
 import os
@@ -97,7 +97,7 @@ def add_channels(datasets):
     return datasets
 
 
-def process_hour(year, month, day, hour):
+def process_hour(year, month, day, hour, destination):
     """
     Process a single gpm_file and return extracted co-locations as
     ``xarray.Dataset``.
@@ -107,6 +107,7 @@ def process_hour(year, month, day, hour):
         goes_16_l1b_radiances_all_full_disk
     )
     from hydronn.data.goes import GOES16File
+    from hydronn.utils import save_and_compress
 
     tmp = mkdtemp()
     tmp = Path(tmp)
@@ -134,7 +135,14 @@ def process_hour(year, month, day, hour):
     # Make sure temporary directory is cleaned up.
     shutil.rmtree(tmp, ignore_errors=True)
 
-    return xr.concat(datasets, dim="time")
+    dataset = xr.concat(datasets, dim="time")
+    filename = (f"hydronn_input_{year:04}_{month:02}"
+                f"_{day:02}_{hour:02}.nc")
+    save_and_compress(dataset, filename)
+
+    del goes_files
+    del datasets
+    del dataset
 
 
 def save_data(data, filename):
@@ -155,6 +163,7 @@ def run(args):
         args: The namespace object provided by the top-level parser.
     """
     from hydronn.data.gpm import get_gpm_files
+    from hydronn.utils import save_and_compress
     year = args.year
     month = args.month
     days = args.days
@@ -165,22 +174,22 @@ def run(args):
         destination.mkdir(parents=True)
 
     pool = ThreadPoolExecutor(max_workers=args.n_processes)
-    save_pool = ProcessPoolExecutor(max_workers=1)
+    save_pool = ThreadPoolExecutor(max_workers=1)
 
     for d in days:
         tasks = []
-        hours = list(range(0, 13))
-        hours = [11, 12, 16]
+        hours = list(range(0, 24))
         for h in hours:
-            tasks.append(pool.submit(process_hour, year, month, d, h))
+            tasks.append(
+                pool.submit(process_hour, year, month, d, h, destination)
+            )
 
         for h, t in zip(hours, tasks):
             try:
                 data = t.result()
-                filename = (f"hydronn_input_{year:04}_{month:02}"
-                            f"_{d:02}_{h:02}.nc")
-                print("SAVING : ", str(destination / filename))
-                save_pool.submit(save_data, data, destination / filename)
+                LOGGER.warning(
+                    "Finished processing hour %s.", h
+                )
             except Exception as e:
                 LOGGER.warning(
                     "Processing of hour %s  failed with the following "
