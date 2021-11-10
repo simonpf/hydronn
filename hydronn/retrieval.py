@@ -131,7 +131,7 @@ class Retrieval:
             normalizer: The normalizer object to use to normalize the
                 inputs.
         """
-        self.input_files = input_files
+        self.input_files = sorted(input_files)
         self.model = model
         self.normalizer = normalizer
 
@@ -139,15 +139,13 @@ class Retrieval:
         """
         Run retrieval for a single input files.
         """
-
-
         input_data = InputFile(input_file,
                                self.normalizer,
                                1)
 
-        y_pred_naive = None
-        y_mean_naive = None
-        y_sample_naive = None
+        y_pred_dep = None
+        y_mean_dep = None
+        y_sample_dep = None
         y_pred_indep = None
         y_mean_indep = None
         y_sample_indep = None
@@ -168,25 +166,26 @@ class Retrieval:
                     bins
                 )
 
-                if y_pred_naive is None:
-                    y_pred_naive = (1 / n) * y_pred
+                if y_pred_dep is None:
+                    y_pred_dep = (1 / n) * y_pred
                     y_pred_indep = y_pred
                 else:
-                    y_pred_naive = y_pred_naive + (1 / n) * y_pred
+                    y_pred_dep = y_pred_dep + (1 / n) * y_pred
                     y_pred_indep = qd.add(
                         y_pred_indep, bins, y_pred, bins, bins
                     )
 
-        sample_naive = qd.sample_posterior(
-            y_pred_naive, bins
+        sample_dep = qd.sample_posterior(
+            y_pred_dep, bins
         ).cpu().numpy()[:, 0]
-        quantiles_naive = qd.posterior_quantiles(
-            y_pred_naive, bins, quantiles
+        quantiles_dep = qd.posterior_quantiles(
+            y_pred_dep, bins, quantiles
         ).cpu().numpy().transpose([0, 2, 3, 1])
-        mean_naive = qd.posterior_mean(
-            y_pred_naive, bins
+        mean_dep = qd.posterior_mean(
+            y_pred_dep, bins
         ).cpu().numpy()
 
+        y_pred_indep = n * y_pred_indep
         sample_indep = qd.sample_posterior(
             y_pred_indep, bins_acc
         ).cpu().numpy()[:, 0]
@@ -199,13 +198,13 @@ class Retrieval:
 
         dims = ("time", "x", "y")
         results = xr.Dataset({
-            "time":  ("time", [input_data.data.time.mean("time").item()]),
+            "time":  ("time", input_data.data.time.mean("time").data.reshape((1,))),
             "latitude": input_data.data.latitude.mean("time"),
             "longitude": input_data.data.longitude.mean("time"),
             "quantiles": (("quantiles",), quantiles),
-            "mean_naive": (dims, mean_naive),
-            "sample_naive": (dims, sample_naive),
-            "quantiles_naive": (dims + ("quantiles",), quantiles_naive),
+            "mean_dep": (dims, mean_dep),
+            "sample_dep": (dims, sample_dep),
+            "quantiles_dep": (dims + ("quantiles",), quantiles_dep),
             "mean_indep": (dims, mean_indep),
             "sample_indep": (dims, sample_indep),
             "quantiles_indep": (dims + ("quantiles",), quantiles_indep)
