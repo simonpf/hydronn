@@ -115,6 +115,8 @@ def run(args):
                                   overlap=overlap,
                                   device=device)
             results = retrieval.run()
+            if not o.parent.exists():
+                o.parent.mkdir(parents=True)
             results.to_netcdf(o)
             print(f"Finished processing input file '{f}'")
 
