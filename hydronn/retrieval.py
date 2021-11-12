@@ -310,15 +310,17 @@ class Retrieval:
         mean_indep = []
 
         for i in range(tiler.M):
+
+            sample_dep.append([])
+            quantiles_dep.append([])
+            mean_dep.append([])
+
+            sample_indep.append([])
+            quantiles_indep.append([])
+            mean_indep.append([])
+
             for j in range(tiler.N):
 
-                sample_dep.append([])
-                quantiles_dep.append([])
-                mean_dep.append([])
-
-                sample_indep.append([])
-                quantiles_indep.append([])
-                mean_indep.append([])
 
                 with torch.no_grad():
                     # Retrieve tile
@@ -347,50 +349,32 @@ class Retrieval:
                                 y_pred_indep, bins, y_pred, bins, bins
                             )
 
-                        del y_pred
-                        if device.startswith("cuda"):
-                            torch.cuda.empty_cache()
-
                     sample_dep[-1].append(qd.sample_posterior(
                         y_pred_dep, bins
                     ).cpu().numpy()[:, 0])
-                    if device.startswith("cuda"):
-                        torch.cuda.empty_cache()
                     quantiles_dep[-1].append(qd.posterior_quantiles(
                         y_pred_dep, bins, quantiles
                     ).cpu().numpy().transpose([0, 2, 3, 1]))
-                    if device.startswith("cuda"):
-                        torch.cuda.empty_cache()
                     mean_dep[-1].append(qd.posterior_mean(
                         y_pred_dep, bins
                     ).cpu().numpy())
-                    del y_pred_dep
-                    if device.startswith("cuda"):
-                        torch.cuda.empty_cache()
 
                     y_pred_indep = n * y_pred_indep
                     sample_indep[-1].append(qd.sample_posterior(
                         y_pred_indep, bins_acc
                     ).cpu().numpy()[:, 0])
-                    if device.startswith("cuda"):
-                        torch.cuda.empty_cache()
                     quantiles_indep[-1].append(qd.posterior_quantiles(
                         y_pred_indep, bins_acc, quantiles
                     ).cpu().numpy().transpose([0, 2, 3, 1]))
-                    if device.startswith("cuda"):
-                        torch.cuda.empty_cache()
                     mean_indep[-1].append(qd.posterior_mean(
                         y_pred_indep, bins_acc
                     ).cpu().numpy())
-                    del y_pred_indep
-                    if device.startswith("cuda"):
-                        torch.cuda.empty_cache()
 
         # Finally, concatenate over rows and columns.
         sample_dep = np.concatenate(
             [np.concatenate(r, -1) for r in sample_dep], -2)
         quantiles_dep = np.concatenate(
-            [np.concatenate(r, -1) for r in quantiles_dep], -2
+            [np.concatenate(r, -2) for r in quantiles_dep], -3
         )
         mean_dep = np.concatenate(
             [np.concatenate(r, -1) for r in mean_dep], -2
@@ -400,7 +384,7 @@ class Retrieval:
             [np.concatenate(r, -1) for r in sample_indep], -2
         )
         quantiles_indep = np.concatenate(
-            [np.concatenate(r, -1) for r in quantiles_indep], -2
+            [np.concatenate(r, -2) for r in quantiles_indep], -3
         )
         mean_indep = np.concatenate(
             [np.concatenate(r, -1) for r in mean_indep], -2
