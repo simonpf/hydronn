@@ -4,8 +4,6 @@ import re
 
 import numpy as np
 import pandas as pd
-from pansat.products.satellite.goes import goes_16_l1b_radiances_all_full_disk
-from pansat.download.providers.goes_aws import GOESAWSProvider
 from satpy import Scene
 import torch
 import xarray as xr
@@ -111,6 +109,9 @@ class GOES16File:
         Return:
             GOES16File object
         """
+        from pansat.products.satellite.goes import goes_16_l1b_radiances_all_full_disk
+        from pansat.download.providers.goes_aws import GOESAWSProvider
+
         time = pd.Timestamp(time).to_pydatetime()
         start_time = time - timedelta(minutes=5)
         end_time = start_time + timedelta(minutes=10)
