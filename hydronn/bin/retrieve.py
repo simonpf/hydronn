@@ -94,14 +94,20 @@ def run(args):
     output_files = []
     if input_path.is_file():
         input_files.append(input_path)
-        output_file = input_path.relative_to(input_path)
-        output_files.append(output_path / output_file)
     else:
         for f in input_path.glob("**/*"):
             if FILE_PATTERN.match(f.name):
                 input_files.append(f)
-                output_file = f.relative_to(input_path)
-                output_files.append(output_path / output_file)
+
+    for f in input_files:
+        output_parent = f.relative_to(input_path).parent
+        output_file = f.name.replace("input", "output")
+        if output_file.endswith(".gz"):
+            output_file = output_file[:-3]
+        output_files.append(output_parent / output_file)
+
+    
+    print(input_files, output_files)
 
     tile_size = args.tile_size
     overlap = args.overlap
@@ -122,4 +128,5 @@ def run(args):
                 o = str(o)[:-3]
             results.to_netcdf(o)
             print(f"Finished processing input file '{f}'")
+            pass
 
