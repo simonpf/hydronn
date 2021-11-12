@@ -99,8 +99,8 @@ def run(args):
         for f in input_path.glob("**/*"):
             if FILE_PATTERN.match(f.name):
                 input_files.append(f)
-                output_file = f.relative_to(output_path)
-                output_files.append(output_file)
+                output_file = f.relative_to(input_path)
+                output_files.append(output_path / output_file)
 
     tile_size = args.tile_size
     overlap = args.overlap
