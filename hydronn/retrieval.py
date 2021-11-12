@@ -56,7 +56,7 @@ class InputFile:
         """
         m = ROW_END - ROW_START
         n = COL_END - COL_START
-        t = t_start - t_end
+        t = t_end - t_start
 
         low_res = []
         for c in LOW_RES_CHANNELS:
