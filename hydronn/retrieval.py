@@ -231,7 +231,7 @@ class Tiler:
             i_clip_l = 0
         else:
             i_clip_l = self.i_clip[i - 1]
-        if i == self.M - 1:
+        if i >= self.M - 2:
             i_clip_r = None
         else:
             i_clip_r = -self.i_clip[i]
@@ -241,7 +241,7 @@ class Tiler:
             j_clip_l = 0
         else:
             j_clip_l = self.j_clip[j - 1]
-        if j == self.N - 1:
+        if j >= self.N - 2:
             j_clip_r = None
         else:
             j_clip_r = -self.j_clip[j]
