@@ -111,7 +111,7 @@ class InputFile:
 
     def __getitem__(self, i):
         """Return a given batch."""
-        if self.batch_size < 0:
+        if (self.batch_size < 0) or (self.batch_size > self.data.time.size):
             return self.get_input_data(0, self.data.time.size)
         else:
             t_start = i * self.batch_size
