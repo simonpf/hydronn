@@ -242,9 +242,9 @@ def run(args):
         xrnn = None
 
     if xrnn is None:
-        bins = np.logspace(-3, 3, 257)
+        bins = np.logspace(-3, 3, 129)
         model = Hydronn(
-            256, n_blocks, n_features_body,
+            128, n_blocks, n_features_body,
             n_layers_head, n_features_head
         )
         xrnn = DRNN(model=model, bins=bins)
