@@ -55,7 +55,8 @@ def add_parser(subparsers):
     parser.add_argument(
         '--tile_size', metavar='N', type=int,
         help='Size of the tiles that are processed simultaneously',
-        default=256
+        nargs="+"
+        default=[256,]
     )
     parser.add_argument(
         '--overlap', metavar='N', type=int,

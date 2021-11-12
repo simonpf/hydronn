@@ -172,14 +172,18 @@ class Tiler:
         self.m = m
         self.n = n
 
+        if not isinstance(tile_size, tuple):
+            tile_size = (tile_size, tile_size)
+        if len(tile_size) == 1:
+            tile_size = tile_size * 2
         self.tile_size = tile_size
         self.overlap = overlap
 
-        i_start, i_clip = get_start_and_clips(self.m, tile_size, overlap)
+        i_start, i_clip = get_start_and_clips(self.m, tile_size[0], overlap)
         self.i_start = i_start
         self.i_clip = i_clip
 
-        j_start, j_clip = get_start_and_clips(self.n, tile_size, overlap)
+        j_start, j_clip = get_start_and_clips(self.n, tile_size[1], overlap)
         self.j_start = j_start
         self.j_clip = j_clip
 
@@ -200,9 +204,9 @@ class Tiler:
             of input tensors.
         """
         i_start = self.i_start[i]
-        i_end = i_start + self.tile_size
-        j_start = self.j_start[i]
-        j_end = j_start + self.tile_size
+        i_end = i_start + self.tile_size[0]
+        j_start = self.j_start[j]
+        j_end = j_start + self.tile_size[1]
 
         x_tile = []
         for x in self.x:
