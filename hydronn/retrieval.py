@@ -172,7 +172,7 @@ class Tiler:
         self.m = m
         self.n = n
 
-        if not isinstance(tile_size, tuple):
+        if isinstance(tile_size, int):
             tile_size = (tile_size, tile_size)
         if len(tile_size) == 1:
             tile_size = tile_size * 2
