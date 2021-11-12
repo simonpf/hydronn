@@ -244,7 +244,7 @@ class Tiler:
         if j == self.N - 1:
             j_clip_r = None
         else:
-            j_clip_r = -self.j_clip[i]
+            j_clip_r = -self.j_clip[j]
         slice_j = slice(j_clip_l, j_clip_r)
 
         return (slice_i, slice_j)
@@ -252,6 +252,7 @@ class Tiler:
 
     def __repr__(self):
         return f"Tiler(tile_size={self.tile_size}, overlap={self.overlap})"
+
 
 
 class Retrieval:
@@ -308,8 +309,6 @@ class Retrieval:
         quantiles_indep = [[]]
         mean_indep = [[]]
 
-        print(tiler.M, tiler.N)
-
         for i in range(tiler.M):
             for j in range(tiler.N):
 
@@ -326,7 +325,6 @@ class Retrieval:
                         x_t_b = [t[[k]] for t in x_t]
                         x_t_b = [t.to(device) for t in x_t_b]
                         y_pred = model(x_t_b)[(...,) + slices]
-                        print(slices, y_pred.shape)
                         y_pred = self.model._post_process_prediction(
                             y_pred,
                             bins

@@ -93,8 +93,8 @@ def run(args):
     output_files = []
     if input_path.is_file():
         input_files.append(input_path)
-        output_file = input_path.relative_to(output_path)
-        output_files.append(output_file)
+        output_file = input_path.relative_to(input_path)
+        output_files.append(output_path / output_file)
     else:
         for f in input_path.glob("**/*"):
             if FILE_PATTERN.match(f.name):
