@@ -79,7 +79,7 @@ def run(args):
     if not model.exists():
         LOGGER.error("The model %s' does not exist.", model)
     model = QRNN.load(model)
-    normalizer = model.noramlizer
+    normalizer = model.normalizer
 
     input_path = Path(args.input_path)
     if not input_path.exists():
