@@ -296,9 +296,7 @@ class Retrieval:
         ]
         device = self.device
 
-        n = len(input_data)
         bins = torch.Tensor(self.model.bins).to(device)
-        bins_acc = (1 / n) * bins
 
         model = self.model.model.to(device)
 
@@ -335,6 +333,9 @@ class Retrieval:
                     y_pred_indep = None
 
                     # Process each sample in batch separately.
+                    n = len(input_data)
+                    bins_acc = (1 / n) * bins
+
                     for k in range(x_t[0].shape[0]):
                         x_t_b = [t[[k]] for t in x_t]
                         x_t_b = [t.to(device) for t in x_t_b]
