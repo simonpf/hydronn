@@ -323,6 +323,7 @@ class Retrieval:
                 with torch.no_grad():
                     # Retrieve tile
                     x_t = tiler.get_tile(i, j)
+                    print(tiler.M, tiler.N, i, j)
                     slices = tiler.get_slices(i, j)
 
                     y_pred_dep = None
