@@ -143,7 +143,7 @@ def get_start_and_clips(n, tile_size, overlap):
             clip.append(overlap // 2)
         j = j + tile_size - overlap
     start.append(max(n - tile_size, 0))
-    if len(start) > 2:
+    if len(start) > 1:
         clip.append((start[-2] + tile_size - start[-1]) // 2)
     start = start
     clip = clip
