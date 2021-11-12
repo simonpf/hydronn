@@ -109,6 +109,13 @@ def process_hour(year, month, day, hour, destination):
     from hydronn.data.goes import GOES16File
     from hydronn.utils import save_and_compress
 
+    filename = (f"hydronn_input_{year:04}_{month:02}"
+                f"_{day:02}_{hour:02}.nc")
+    output_file = destination / filename
+    if output_file.exists():
+        LOGGER.info("File '%s' already exists. Skipping.")
+        return None
+
     tmp = mkdtemp()
     tmp = Path(tmp)
 
@@ -136,8 +143,6 @@ def process_hour(year, month, day, hour, destination):
     shutil.rmtree(tmp, ignore_errors=True)
 
     dataset = xr.concat(datasets, dim="time")
-    filename = (f"hydronn_input_{year:04}_{month:02}"
-                f"_{day:02}_{hour:02}.nc")
     save_and_compress(dataset, filename)
 
     del goes_files
@@ -164,6 +169,9 @@ def run(args):
     """
     from hydronn.data.gpm import get_gpm_files
     from hydronn.utils import save_and_compress
+
+    logging.basicConfig(level=logging.INFO)
+
     year = args.year
     month = args.month
     days = args.days

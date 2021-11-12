@@ -63,6 +63,10 @@ def add_parser(subparsers):
         help='Overlap between neighboring tiles',
         default=32
     )
+    parser.add_argument(
+        '--subset', metavar='even / odd', type=str,
+        help='Retrieve only even or odd days.'
+    )
     parser.set_defaults(func=run)
 
 def run(args):
@@ -75,6 +79,7 @@ def run(args):
     """
     from quantnn.qrnn import QRNN
     from hydronn.retrieval import Retrieval
+    from hydronn.utils import save_and_compress
 
     model = Path(args.model)
     if not model.exists():
@@ -93,21 +98,32 @@ def run(args):
     input_files = []
     output_files = []
     if input_path.is_file():
-        input_files.append(input_path)
+        input_files.append(Path(input_path))
     else:
         for f in input_path.glob("**/*"):
             if FILE_PATTERN.match(f.name):
                 input_files.append(f)
 
+    subset = args.subset
+    if subset is not None:
+        if subset.lower() == "even":
+            m = 0
+        else:
+            m = 1
+
+        input_files_filtered = []
+        for f in input_files:
+            day = int(f.name.split("_")[4])
+            if day % 2 == m:
+                input_files_filtered.append(f)
+        input_files = input_files_filtered
+
     for f in input_files:
-        output_parent = f.relative_to(input_path).parent
+        output_parent = output_path / f.relative_to(input_path).parent
         output_file = f.name.replace("input", "output")
         if output_file.endswith(".gz"):
             output_file = output_file[:-3]
         output_files.append(output_parent / output_file)
-
-    
-    print(input_files, output_files)
 
     tile_size = args.tile_size
     overlap = args.overlap
@@ -126,7 +142,6 @@ def run(args):
                 o.parent.mkdir(parents=True)
             if str(o).endswith(".gz"):
                 o = str(o)[:-3]
-            results.to_netcdf(o)
+            save_and_compress(results, o)
             print(f"Finished processing input file '{f}'")
-            pass
 
