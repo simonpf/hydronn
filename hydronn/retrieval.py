@@ -231,7 +231,7 @@ class Tiler:
             i_clip_l = 0
         else:
             i_clip_l = self.i_clip[i - 1]
-        if i >= self.M - 2:
+        if i >= self.M - 1:
             i_clip_r = None
         else:
             i_clip_r = -self.i_clip[i]
@@ -241,7 +241,7 @@ class Tiler:
             j_clip_l = 0
         else:
             j_clip_l = self.j_clip[j - 1]
-        if j >= self.N - 2:
+        if j >= self.N - 1:
             j_clip_r = None
         else:
             j_clip_r = -self.j_clip[j]
@@ -388,24 +388,23 @@ class Retrieval:
 
         # Finally, concatenate over rows and columns.
         sample_dep = np.concatenate(
-            [np.concatenate([c for c in r], -1) for r in sample_dep],
-            -2)
+            [np.concatenate(r, -1) for r in sample_dep], -2)
         quantiles_dep = np.concatenate(
-            [np.concatenate([c for c in r], -1) for r in quantiles_dep],
-            -2)
+            [np.concatenate(r, -1) for r in quantiles_dep], -2
+        )
         mean_dep = np.concatenate(
-            [np.concatenate([c for c in r], -1) for r in mean_dep],
-            -2)
+            [np.concatenate(r, -1) for r in mean_dep], -2
+        )
 
         sample_indep = np.concatenate(
-            [np.concatenate([c for c in r], -1) for r in sample_indep],
-            -2)
+            [np.concatenate(r, -1) for r in sample_indep], -2
+        )
         quantiles_indep = np.concatenate(
-            [np.concatenate([c for c in r], -1) for r in quantiles_indep],
-            -2)
+            [np.concatenate(r, -1) for r in quantiles_indep], -2
+        )
         mean_indep = np.concatenate(
-            [np.concatenate([c for c in r], -1) for r in mean_indep],
-            -2)
+            [np.concatenate(r, -1) for r in mean_indep], -2
+        )
 
         dims = ("time", "x", "y")
         results = xr.Dataset({
