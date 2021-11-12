@@ -64,7 +64,8 @@ class InputFile:
             if channel_name in self.data:
                 x = self.data[channel_name].data[t_start:t_end]
             else:
-                x = np.zeros((t, m, n), dytpe=np.float32)
+                x = np.zeros((t, m, n), dtype=np.float32)
+                x[:] = np.nan
             low_res.append(x)
         low_res = np.stack(low_res, axis=1)
 
@@ -74,7 +75,8 @@ class InputFile:
             if channel_name in self.data:
                 x = self.data[channel_name].data[t_start:t_end]
             else:
-                x = np.zeros((t, 2 * m, 2 * n), dytpe=np.float32)
+                x = np.zeros((t, 2 * m, 2 * n), dtype=np.float32)
+                x[:] = np.nan
             med_res.append(x)
         med_res = np.stack(med_res, axis=1)
 
@@ -84,7 +86,8 @@ class InputFile:
             if channel_name in self.data:
                 x = self.data[channel_name].data[t_start:t_end]
             else:
-                x = np.zeros((t, 4 * m, 4 * n), dytpe=np.float32)
+                x = np.zeros((t, 4 * m, 4 * n), dtype=np.float32)
+                x[:] = np.nan
             hi_res.append(x)
         hi_res = np.stack(hi_res, axis=1)
 
