@@ -118,6 +118,8 @@ def run(args):
             results = retrieval.run()
             if not o.parent.exists():
                 o.parent.mkdir(parents=True)
+            if str(o).endswith(".gz"):
+                o = str(o)[:-3]
             results.to_netcdf(o)
             print(f"Finished processing input file '{f}'")
 
