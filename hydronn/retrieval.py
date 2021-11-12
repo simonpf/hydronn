@@ -301,16 +301,24 @@ class Retrieval:
         x = input_data[0]
         tiler = Tiler(x, tile_size=self.tile_size, overlap=self.overlap)
 
-        sample_dep = [[]]
-        quantiles_dep = [[]]
-        mean_dep = [[]]
+        sample_dep = []
+        quantiles_dep = []
+        mean_dep = []
 
-        sample_indep = [[]]
-        quantiles_indep = [[]]
-        mean_indep = [[]]
+        sample_indep = []
+        quantiles_indep = []
+        mean_indep = []
 
         for i in range(tiler.M):
             for j in range(tiler.N):
+
+                sample_dep.append([])
+                quantiles_dep.append([])
+                mean_dep.append([])
+
+                sample_indep.append([])
+                quantiles_indep.append([])
+                mean_indep.append([])
 
                 with torch.no_grad():
                     # Retrieve tile
@@ -378,34 +386,26 @@ class Retrieval:
                     if device.startswith("cuda"):
                         torch.cuda.empty_cache()
 
-            sample_dep.append([])
-            quantiles_dep.append([])
-            mean_dep.append([])
-
-            sample_indep.append([])
-            quantiles_indep.append([])
-            mean_indep.append([])
-
         # Finally, concatenate over rows and columns.
         sample_dep = np.concatenate(
-            [np.concatenate([c for c in r], -1) for r in sample_dep]
-        )
+            [np.concatenate([c for c in r], -1) for r in sample_dep],
+            -2)
         quantiles_dep = np.concatenate(
-            [np.concatenate([c for c in r], -1) for r in quantiles_dep]
-        )
+            [np.concatenate([c for c in r], -1) for r in quantiles_dep],
+            -2)
         mean_dep = np.concatenate(
-            [np.concatenate([c for c in r], -1) for r in mean_dep]
-        )
+            [np.concatenate([c for c in r], -1) for r in mean_dep],
+            -2)
 
         sample_indep = np.concatenate(
-            [np.concatenate([c for c in r], -1) for r in sample_indep]
-        )
+            [np.concatenate([c for c in r], -1) for r in sample_indep],
+            -2)
         quantiles_indep = np.concatenate(
-            [np.concatenate([c for c in r], -1) for r in quantiles_indep]
-        )
+            [np.concatenate([c for c in r], -1) for r in quantiles_indep],
+            -2)
         mean_indep = np.concatenate(
-            [np.concatenate([c for c in r], -1) for r in mean_indep]
-        )
+            [np.concatenate([c for c in r], -1) for r in mean_indep],
+            -2)
 
         dims = ("time", "x", "y")
         results = xr.Dataset({
