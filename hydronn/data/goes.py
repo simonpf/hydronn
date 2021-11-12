@@ -4,7 +4,6 @@ import re
 
 import numpy as np
 import pandas as pd
-from satpy import Scene
 import torch
 import xarray as xr
 
@@ -198,6 +197,7 @@ class GOES16File:
             channel_files: The files containing the GOES observations
                 for each of the channels.
         """
+        from satpy import Scene
         start_times = get_start_times(channel_files)
         self.start_time = min(start_times)
         tds = [(t - self.start_time).total_seconds() for t in start_times]
