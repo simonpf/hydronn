@@ -17,6 +17,7 @@ from hydronn.data.goes import (LOW_RES_CHANNELS,
                                ROW_END,
                                COL_START,
                                COL_END)
+from hydronn.utils import decompress_and_load
 
 
 class InputFile:
@@ -35,7 +36,7 @@ class InputFile:
                 inputs.
             batch_size: How many observations to combine to a single input.
         """
-        self.data = xr.load_dataset(filename).sortby("time")
+        self.data = decompress_and_load(filename).sortby("time")
         self.normalizer = normalizer
         self.batch_size = batch_size
 
@@ -114,6 +115,144 @@ class InputFile:
             t_end = t_start + self.batch_size
             return self.get_input_data(t_start, t_end)
 
+###############################################################################
+# Tiling functionality
+###############################################################################
+
+
+def get_start_and_clips(n, tile_size, overlap):
+    """
+    Calculate start indices and numbers of clipped pixels for a given
+    side length, tile size and overlap.
+
+    Args:
+        n: The image size to tile in pixels.
+        tile_size: The size of each tile
+        overlap: The number of pixels of overlap.
+
+    Rerturn:
+        A tuple ``(start, clip)`` containing the start indices of each tile
+        and the number of pixels to clip between each neighboring tiles.
+    """
+    start = []
+    clip = []
+    j = 0
+    while j + tile_size < n:
+        start.append(j)
+        if j > 0:
+            clip.append(overlap // 2)
+        j = j + tile_size - overlap
+    start.append(max(n - tile_size, 0))
+    if len(start) > 2:
+        clip.append((start[-2] + tile_size - start[-1]) // 2)
+    start = start
+    clip = clip
+    return start, clip
+
+
+class Tiler:
+    """
+    Helper class that performs two-dimensional tiling of retrieval inputs and
+    calculates clipping ranges for the reassembly of tiled predictions.
+
+    Attributes:
+        M: The number of tiles along the first image dimension (rows).
+        N: The number of tiles along the second image dimension (columns).
+    """
+    def __init__(self, x, tile_size=512, overlap=32):
+        """
+        Args:
+            x: List of input tensors for the hydronn retrieval.
+            tile_size: The size of a single tile.
+            overlap: The overlap between two subsequent tiles.
+        """
+
+        self.x = x
+        _, _, m, n = x[0].shape
+        self.m = m
+        self.n = n
+
+        self.tile_size = tile_size
+        self.overlap = overlap
+
+        i_start, i_clip = get_start_and_clips(self.m, tile_size, overlap)
+        self.i_start = i_start
+        self.i_clip = i_clip
+
+        j_start, j_clip = get_start_and_clips(self.n, tile_size, overlap)
+        self.j_start = j_start
+        self.j_clip = j_clip
+
+        self.M = len(i_start)
+        self.N = len(j_start)
+
+    def get_tile(self, i, j):
+        """
+        Get tile in the 'i'th row and 'j'th column of the two
+        dimensional tiling.
+
+        Args:
+            i: The 0-based row index of the tile.
+            j: The 0-based column index of the tile.
+
+        Return:
+            List containing the tile extracted from the list
+            of input tensors.
+        """
+        i_start = self.i_start[i]
+        i_end = i_start + self.tile_size
+        j_start = self.j_start[i]
+        j_end = j_start + self.tile_size
+
+        x_tile = []
+        for x in self.x:
+            x_tile.append(x[..., i_start:i_end, j_start:j_end])
+            i_start *= 2
+            i_end *= 2
+            j_start *= 2
+            j_end *= 2
+
+        return  x_tile
+
+    def get_slices(self, i, j):
+        """
+        Return slices for the clipping of the result tensors.
+
+        Args:
+            i: The 0-based row index of the tile.
+            j: The 0-based column index of the tile.
+
+        Return:
+            Tuple of slices that can be used to clip the retrieval
+            results to obtain non-overlapping tiles.
+        """
+
+        if i == 0:
+            i_clip_l = 0
+        else:
+            i_clip_l = self.i_clip[i - 1]
+        if i == self.M - 1:
+            i_clip_r = None
+        else:
+            i_clip_r = -self.i_clip[i]
+        slice_i = slice(i_clip_l, i_clip_r)
+
+        if j == 0:
+            j_clip_l = 0
+        else:
+            j_clip_l = self.j_clip[j - 1]
+        if j == self.N - 1:
+            j_clip_r = None
+        else:
+            j_clip_r = -self.j_clip[i]
+        slice_j = slice(j_clip_l, j_clip_r)
+
+        return (slice_i, slice_j)
+
+
+    def __repr__(self):
+        return f"Tiler(tile_size={self.tile_size}, overlap={self.overlap})"
+
 
 class Retrieval:
     """
@@ -122,7 +261,10 @@ class Retrieval:
     def __init__(self,
                  input_files,
                  model,
-                 normalizer):
+                 normalizer,
+                 tile_size=256,
+                 overlap=32,
+                 device="cuda"):
         """
         Args:
             input_files: The list of input files for which to run the
@@ -134,67 +276,138 @@ class Retrieval:
         self.input_files = sorted(input_files)
         self.model = model
         self.normalizer = normalizer
+        self.tile_size = tile_size
+        self.overlap = overlap
+        self.device = device
 
     def _run_file(self, input_file):
         """
         Run retrieval for a single input files.
         """
-        input_data = InputFile(input_file,
-                               self.normalizer,
-                               1)
-
-        y_pred_dep = None
-        y_mean_dep = None
-        y_sample_dep = None
-        y_pred_indep = None
-        y_mean_indep = None
-        y_sample_indep = None
-
-        quantiles = [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]
+        input_data = InputFile(input_file, self.normalizer, batch_size=6)
+        quantiles = [
+            0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6,
+            0.7, 0.8, 0.9, 0.95, 0.99, 0.999
+        ]
+        device = self.device
 
         n = len(input_data)
-        bins = torch.Tensor(self.model.bins)
+        bins = torch.Tensor(self.model.bins).to(device)
         bins_acc = (1 / n) * bins
 
-        for i in range(len(input_data)):
-            x = input_data[i]
-            with torch.no_grad():
+        model = self.model.model.to(device)
 
-                y_pred = self.model.model(x)
-                y_pred = self.model._post_process_prediction(
-                    y_pred,
-                    bins
-                )
+        x = input_data[0]
+        tiler = Tiler(x, tile_size=self.tile_size, overlap=self.overlap)
 
-                if y_pred_dep is None:
-                    y_pred_dep = (1 / n) * y_pred
-                    y_pred_indep = y_pred
-                else:
-                    y_pred_dep = y_pred_dep + (1 / n) * y_pred
-                    y_pred_indep = qd.add(
-                        y_pred_indep, bins, y_pred, bins, bins
-                    )
+        sample_dep = [[]]
+        quantiles_dep = [[]]
+        mean_dep = [[]]
 
-        sample_dep = qd.sample_posterior(
-            y_pred_dep, bins
-        ).cpu().numpy()[:, 0]
-        quantiles_dep = qd.posterior_quantiles(
-            y_pred_dep, bins, quantiles
-        ).cpu().numpy().transpose([0, 2, 3, 1])
-        mean_dep = qd.posterior_mean(
-            y_pred_dep, bins
-        ).cpu().numpy()
+        sample_indep = [[]]
+        quantiles_indep = [[]]
+        mean_indep = [[]]
 
-        y_pred_indep = n * y_pred_indep
-        sample_indep = qd.sample_posterior(
-            y_pred_indep, bins_acc
-        ).cpu().numpy()[:, 0]
-        quantiles_indep = qd.posterior_quantiles(
-            y_pred_indep, bins_acc, quantiles
-        ).cpu().numpy().transpose([0, 2, 3, 1])
-        mean_indep = qd.posterior_mean(
-            y_pred_indep, bins_acc
-        ).cpu().numpy()
+        print(tiler.M, tiler.N)
+
+        for i in range(tiler.M):
+            for j in range(tiler.N):
+
+                with torch.no_grad():
+                    # Retrieve tile
+                    x_t = tiler.get_tile(i, j)
+                    slices = tiler.get_slices(i, j)
+
+                    y_pred_dep = None
+                    y_pred_indep = None
+
+                    # Process each sample in batch separately.
+                    for k in range(x_t[0].shape[0]):
+                        x_t_b = [t[[k]] for t in x_t]
+                        x_t_b = [t.to(device) for t in x_t_b]
+                        y_pred = model(x_t_b)[(...,) + slices]
+                        print(slices, y_pred.shape)
+                        y_pred = self.model._post_process_prediction(
+                            y_pred,
+                            bins
+                        )
+
+                        if y_pred_dep is None:
+                            y_pred_dep = (1 / n) * y_pred
+                            y_pred_indep = y_pred
+                        else:
+                            y_pred_dep = y_pred_dep + (1 / n) * y_pred
+                            y_pred_indep = qd.add(
+                                y_pred_indep, bins, y_pred, bins, bins
+                            )
+
+                        del y_pred
+                        if device.startswith("cuda"):
+                            torch.cuda.empty_cache()
+
+                    sample_dep[-1].append(qd.sample_posterior(
+                        y_pred_dep, bins
+                    ).cpu().numpy()[:, 0])
+                    if device.startswith("cuda"):
+                        torch.cuda.empty_cache()
+                    quantiles_dep[-1].append(qd.posterior_quantiles(
+                        y_pred_dep, bins, quantiles
+                    ).cpu().numpy().transpose([0, 2, 3, 1]))
+                    if device.startswith("cuda"):
+                        torch.cuda.empty_cache()
+                    mean_dep[-1].append(qd.posterior_mean(
+                        y_pred_dep, bins
+                    ).cpu().numpy())
+                    del y_pred_dep
+                    if device.startswith("cuda"):
+                        torch.cuda.empty_cache()
+
+                    y_pred_indep = n * y_pred_indep
+                    sample_indep[-1].append(qd.sample_posterior(
+                        y_pred_indep, bins_acc
+                    ).cpu().numpy()[:, 0])
+                    if device.startswith("cuda"):
+                        torch.cuda.empty_cache()
+                    quantiles_indep[-1].append(qd.posterior_quantiles(
+                        y_pred_indep, bins_acc, quantiles
+                    ).cpu().numpy().transpose([0, 2, 3, 1]))
+                    if device.startswith("cuda"):
+                        torch.cuda.empty_cache()
+                    mean_indep[-1].append(qd.posterior_mean(
+                        y_pred_indep, bins_acc
+                    ).cpu().numpy())
+                    del y_pred_indep
+                    if device.startswith("cuda"):
+                        torch.cuda.empty_cache()
+
+            sample_dep.append([])
+            quantiles_dep.append([])
+            mean_dep.append([])
+
+            sample_indep.append([])
+            quantiles_indep.append([])
+            mean_indep.append([])
+
+        # Finally, concatenate over rows and columns.
+        sample_dep = np.concatenate(
+            [np.concatenate([c for c in r], -1) for r in sample_dep]
+        )
+        quantiles_dep = np.concatenate(
+            [np.concatenate([c for c in r], -1) for r in quantiles_dep]
+        )
+        mean_dep = np.concatenate(
+            [np.concatenate([c for c in r], -1) for r in mean_dep]
+        )
+
+        sample_indep = np.concatenate(
+            [np.concatenate([c for c in r], -1) for r in sample_indep]
+        )
+        quantiles_indep = np.concatenate(
+            [np.concatenate([c for c in r], -1) for r in quantiles_indep]
+        )
+        mean_indep = np.concatenate(
+            [np.concatenate([c for c in r], -1) for r in mean_indep]
+        )
 
         dims = ("time", "x", "y")
         results = xr.Dataset({
