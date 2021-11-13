@@ -37,6 +37,9 @@ class InputFile:
             batch_size: How many observations to combine to a single input.
         """
         self.data = decompress_and_load(filename).sortby("time")
+        dims = ["time", "x", "x_500", "x_1000", "y", "y_500", "y_1000"]
+        dims = [d for d in dims if d in self.data.dims]
+        self.data = self.data.transpose(*dims)
         self.normalizer = normalizer
         self.batch_size = batch_size
 
@@ -63,10 +66,13 @@ class InputFile:
             channel_name = f"C{c:02}"
             if channel_name in self.data:
                 x = self.data[channel_name].data[t_start:t_end]
+                print(self.data[channel_name].data.shape)
             else:
                 x = np.zeros((t, m, n), dtype=np.float32)
+                print(t, m, n)
                 x[:] = np.nan
             low_res.append(x)
+        print([t.shape for t in low_res])
         low_res = np.stack(low_res, axis=1)
 
         med_res = []
@@ -336,8 +342,8 @@ class Retrieval:
                     y_pred_indep = None
 
                     # Process each sample in batch separately.
-                    n = len(input_data)
-                    bins_acc = (1 / n) * bins
+                    n_inputs = x_t[0].shape[0]
+                    bins_acc = (1 / n_inputs) * bins
 
                     for k in range(x_t[0].shape[0]):
                         x_t_b = [t[[k]] for t in x_t]
@@ -349,10 +355,10 @@ class Retrieval:
                         )
 
                         if y_pred_dep is None:
-                            y_pred_dep = (1 / n) * y_pred
+                            y_pred_dep = (1 / n_inputs) * y_pred
                             y_pred_indep = y_pred
                         else:
-                            y_pred_dep = y_pred_dep + (1 / n) * y_pred
+                            y_pred_dep = y_pred_dep + (1 / n_inputs) * y_pred
                             y_pred_indep = qd.add(
                                 y_pred_indep, bins, y_pred, bins, bins
                             )
@@ -367,7 +373,7 @@ class Retrieval:
                         y_pred_dep, bins
                     ).cpu().numpy())
 
-                    y_pred_indep = n * y_pred_indep
+                    y_pred_indep = n_inputs * y_pred_indep
                     sample_indep[-1].append(qd.sample_posterior(
                         y_pred_indep, bins_acc
                     ).cpu().numpy()[:, 0])
@@ -401,6 +407,7 @@ class Retrieval:
         dims = ("time", "x", "y")
         results = xr.Dataset({
             "time":  ("time", input_data.data.time.mean("time").data.reshape((1,))),
+            "n_inputs": (("time",), n_inputs),
             "latitude": input_data.data.latitude.mean("time"),
             "longitude": input_data.data.longitude.mean("time"),
             "quantiles": (("quantiles",), quantiles),

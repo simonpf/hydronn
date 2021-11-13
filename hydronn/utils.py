@@ -29,7 +29,7 @@ def save_and_compress(data, filename):
 
     """
     data.to_netcdf(filename)
-    subprocess.run(["gzip", filename], check=True)
+    subprocess.run(["gzip", "-f", filename], check=True)
 
 
 def decompress_and_load(filename):
