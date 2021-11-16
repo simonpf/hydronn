@@ -144,4 +144,6 @@ def run(args):
                 o = str(o)[:-3]
             save_and_compress(results, o)
             print(f"Finished processing input file '{f}'")
+        else:
+            print(f"File '{f}' already exists. Skipping.")
 

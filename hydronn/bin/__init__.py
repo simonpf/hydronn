@@ -6,6 +6,7 @@ hydronn.bin
 This module implements the 'hydronn' command line applitcation.
 """
 import argparse
+import logging
 import sys
 
 def hydronn():
@@ -33,6 +34,7 @@ def hydronn():
         parser.print_help(sys.stderr)
         return 1
 
+    logging.basicConfig(level="INFO")
     args = parser.parse_args()
     args.func(args)
 

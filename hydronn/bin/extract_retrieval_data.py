@@ -28,30 +28,32 @@ def add_parser(subparsers):
     Add parser for 'extract_retrieval_data' command to top-level CLI.
     """
     parser = subparsers.add_parser(
-            'extract_retrieval_data',
-            description='Extract input for the hydronn retrieval.'
-            )
-    parser.add_argument(
-        'year', metavar='year', type=int,
-        help='The year for which to extract inputs.'
-    )
-    parser.add_argument(
-        'month', metavar='month', type=int,
-        help='The month for which to extract inputs.'
-    )
-    parser.add_argument(
-        'days', metavar='day_1, day_2, ...', type=int, nargs="*",
-        help='The day(s) for which to extract inputs.'
-    )
-    parser.add_argument(
-        'destination', metavar='destination', type=str,
-        help='The folder in which to store the extracted data.'
-    )
-    parser.add_argument('--n_processes',
-                        metavar="n",
+        'extract_retrieval_data',
+        description='Extract input for the hydronn retrieval.')
+    parser.add_argument('year',
+                        metavar='year',
                         type=int,
-                        default=1,
-                        help='The number of processes to use for the processing.')
+                        help='The year for which to extract inputs.')
+    parser.add_argument('month',
+                        metavar='month',
+                        type=int,
+                        help='The month for which to extract inputs.')
+    parser.add_argument('days',
+                        metavar='day_1, day_2, ...',
+                        type=int,
+                        nargs="*",
+                        help='The day(s) for which to extract inputs.')
+    parser.add_argument(
+        'destination',
+        metavar='destination',
+        type=str,
+        help='The folder in which to store the extracted data.')
+    parser.add_argument(
+        '--n_processes',
+        metavar="n",
+        type=int,
+        default=1,
+        help='The number of processes to use for the processing.')
     parser.set_defaults(func=run)
 
 
@@ -67,13 +69,9 @@ def add_channels(datasets):
         channels were missing in some of the datasets.
     """
     import numpy as np
-    from hydronn.data.goes import (LOW_RES_CHANNELS,
-                                   MED_RES_CHANNELS,
-                                   HI_RES_CHANNELS,
-                                   ROW_START,
-                                   ROW_END,
-                                   COL_START,
-                                   COL_END)
+    from hydronn.data.goes import (LOW_RES_CHANNELS, MED_RES_CHANNELS,
+                                   HI_RES_CHANNELS, ROW_START, ROW_END,
+                                   COL_START, COL_END)
     m = ROW_END - ROW_START
     n = COL_END - COL_START
 
@@ -99,22 +97,30 @@ def add_channels(datasets):
 
 def process_hour(year, month, day, hour, destination):
     """
-    Process a single gpm_file and return extracted co-locations as
-    ``xarray.Dataset``.
+    Download and prepare retrieval input for an hour.
+
+    Args:
+        year: The year for which to download the data.
+        month: The month.
+        hour: The day.
+        hour: The hour.
+        destination: Where to store the results.
     """
     from pansat.download.providers.goes_aws import GOESAWSProvider
     from pansat.products.satellite.goes import (
-        goes_16_l1b_radiances_all_full_disk
-    )
+        goes_16_l1b_radiances_all_full_disk)
     from hydronn.data.goes import GOES16File
     from hydronn.utils import save_and_compress
 
     filename = (f"hydronn_input_{year:04}_{month:02}"
                 f"_{day:02}_{hour:02}.nc")
     output_file = destination / filename
-    if output_file.exists():
-        LOGGER.info("File '%s' already exists. Skipping.")
+    output_file_c = destination / (str(filename) + ".gz")
+    if output_file_c.exists():
+        LOGGER.info("File '%s' already exists. Skipping.", output_file_c)
         return None
+    else:
+        LOGGER.info("File '%s' doesn't exist. Continuing.", output_file_c)
 
     tmp = mkdtemp()
     tmp = Path(tmp)
@@ -125,11 +131,9 @@ def process_hour(year, month, day, hour, destination):
     # Download files
     files = []
     provider = GOESAWSProvider(goes_16_l1b_radiances_all_full_disk)
-    filenames = provider.get_files_in_range(
-        start_time,
-        end_time,
-        start_inclusive=False
-    )
+    filenames = provider.get_files_in_range(start_time,
+                                            end_time,
+                                            start_inclusive=False)
     for f in filenames:
         path = tmp / f
         if not path.exists():
@@ -148,15 +152,6 @@ def process_hour(year, month, day, hour, destination):
     del goes_files
     del datasets
     del dataset
-
-
-def save_data(data, filename):
-    """
-    Helper function to load compression and saving of dataset off to another
-    process.
-    """
-    from hydronn.utils import save_and_compress
-    save_and_compress(data, filename)
 
 
 def run(args):
@@ -189,17 +184,13 @@ def run(args):
         hours = list(range(0, 24))
         for h in hours:
             tasks.append(
-                pool.submit(process_hour, year, month, d, h, destination)
-            )
+                pool.submit(process_hour, year, month, d, h, destination))
 
         for h, t in zip(hours, tasks):
             try:
                 data = t.result()
-                LOGGER.infor(
-                    "Finished processing hour %s.", h
-                )
+                LOGGER.info("Finished processing hour %s.", h)
             except Exception as e:
                 LOGGER.warning(
                     "Processing of hour %s  failed with the following "
-                    "exception:\n %s", h, e
-                )
+                    "exception:\n %s", h, e)
