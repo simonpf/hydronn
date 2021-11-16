@@ -407,7 +407,7 @@ class Retrieval:
         dims = ("time", "x", "y")
         results = xr.Dataset({
             "time":  ("time", input_data.data.time.mean("time").data.reshape((1,))),
-            "n_inputs": (("time",), n_inputs),
+            "n_inputs": (("time",), [n_inputs]),
             "latitude": input_data.data.latitude.mean("time"),
             "longitude": input_data.data.longitude.mean("time"),
             "quantiles": (("quantiles",), quantiles),
