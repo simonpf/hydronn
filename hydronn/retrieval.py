@@ -1,8 +1,9 @@
 """
+=================
 hydronn.retrieval
 =================
 
-Functionality for running the hydronn retrieval.
+This module handles the processing of the retrieval.
 """
 import numpy as np
 import xarray as xr
@@ -22,8 +23,9 @@ from hydronn.utils import decompress_and_load
 
 class InputFile:
     """
-    Interface class to load the retrieval input data from the NetCDF files
-    used to store the observations.
+    Interface class to load the GOES observations from the NetCDF files
+    containing the retrieval input and to prepare the input for the
+    neural network model.
     """
     def __init__(self,
                  filename,
@@ -267,7 +269,6 @@ class Tiler:
         return f"Tiler(tile_size={self.tile_size}, overlap={self.overlap})"
 
 
-
 class Retrieval:
     """
     Processor class to run the retrieval for a list of input files.
@@ -286,6 +287,9 @@ class Retrieval:
             model: The model to use for the retrieval.
             normalizer: The normalizer object to use to normalize the
                 inputs.
+            tile_size: The sizes of the tiles for the splitting of
+                the input domain.
+            device: The device on which to run the retrieval.
         """
         self.input_files = sorted(input_files)
         self.model = model
@@ -296,7 +300,16 @@ class Retrieval:
 
     def _run_file(self, input_file):
         """
-        Run retrieval for a single input files.
+        This function implements the processing of observations for one hour.
+        For each input in the input file the posterior distributions are
+        calculated and accumulated to hourly predictions.
+
+        Args:
+            input_file: InputFile object providing access to the observations
+                for a given hour.
+
+        Return:
+            An 'xarray.Dataset' containing the retrieval results.
         """
         input_data = InputFile(input_file, self.normalizer, batch_size=6)
         quantiles = [

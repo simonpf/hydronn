@@ -29,7 +29,7 @@ def add_parser(subparsers):
     """
     parser = subparsers.add_parser(
             'extract_retrieval_data',
-            description='Extract GOES retrieval input.'
+            description='Extract input for the hydronn retrieval.'
             )
     parser.add_argument(
         'year', metavar='year', type=int,
@@ -41,7 +41,7 @@ def add_parser(subparsers):
     )
     parser.add_argument(
         'days', metavar='day_1, day_2, ...', type=int, nargs="*",
-        help='The day for which to extract inputs.'
+        help='The day(s) for which to extract inputs.'
     )
     parser.add_argument(
         'destination', metavar='destination', type=str,
@@ -50,7 +50,7 @@ def add_parser(subparsers):
     parser.add_argument('--n_processes',
                         metavar="n",
                         type=int,
-                        default=4,
+                        default=1,
                         help='The number of processes to use for the processing.')
     parser.set_defaults(func=run)
 
@@ -143,7 +143,7 @@ def process_hour(year, month, day, hour, destination):
     shutil.rmtree(tmp, ignore_errors=True)
 
     dataset = xr.concat(datasets, dim="time")
-    save_and_compress(dataset, filename)
+    save_and_compress(dataset, output_file)
 
     del goes_files
     del datasets
@@ -195,7 +195,7 @@ def run(args):
         for h, t in zip(hours, tasks):
             try:
                 data = t.result()
-                LOGGER.warning(
+                LOGGER.infor(
                     "Finished processing hour %s.", h
                 )
             except Exception as e:
