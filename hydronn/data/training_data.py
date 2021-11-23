@@ -27,7 +27,8 @@ class HydronnDataset:
                  shuffle=True,
                  normalize=True,
                  normalizer=None,
-                 augment=True):
+                 augment=True,
+                 resolution=2):
         """
         Load training data.
 
@@ -40,11 +41,14 @@ class HydronnDataset:
                 high-resolution input data.
             augment: Whether or not to augment the input data with random
                 flips.
+            resolution: 'int' specifying the resolution in km of the surface
+                precipitation ('2' or '4').
         """
         self.filename = filename
         self.batch_size = batch_size
         self.shuffle = shuffle
         self.augment = augment
+        self.resolution = resolution
 
         seed = random.SystemRandom().randint(0, 2 ** 16)
         self.rng = np.random.default_rng(seed)
@@ -115,6 +119,9 @@ class HydronnDataset:
         ], axis=1)
         surface_precip = data.surface_precip.data.astype(np.float32)
         surface_precip = np.nan_to_num(surface_precip, nan=-1)
+        if self.resolution > 2:
+            surface_precip = surface_precip[:, ::2, ::2]
+
         data.close()
 
         self.hi_res = hi_res

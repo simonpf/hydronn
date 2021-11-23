@@ -55,6 +55,13 @@ def add_parser(subparsers):
     )
 
     parser.add_argument(
+        "--resolution",
+        metavar='n',
+        type=int,
+        default=2,
+        help=("The resolution in km at which to perform the retrieval.")
+    )
+    parser.add_argument(
         "--n_features_body",
         metavar='n',
         type=int,
@@ -134,7 +141,7 @@ def run(args):
     from quantnn.transformations import LogLinear
     from quantnn.models.pytorch.logging import TensorBoardLogger
     from quantnn.metrics import ScatterPlot
-    from hydronn.models import Hydronn
+    from hydronn.models import Hydronn2, Hydronn4
     from hydronn.data.training_data import HydronnDataset
     from hydronn.definitions import HYDRONN_DATA_PATH
     from torch import optim
@@ -159,6 +166,7 @@ def run(args):
         )
         return 1
 
+    resolution = args.resolution
     n_blocks = args.n_blocks
     n_features_body = args.n_features_body
     n_layers_head = args.n_features_head
@@ -200,7 +208,8 @@ def run(args):
     kwargs = {
         "batch_size": batch_size,
         "normalizer": normalizer,
-        "augment": True
+        "augment": True,
+        "resolution": resolution
     }
     training_data = DataFolder(
         training_data,
@@ -212,7 +221,8 @@ def run(args):
     kwargs = {
         "batch_size": 4 * batch_size,
         "normalizer": normalizer,
-        "augment": False
+        "augment": False,
+        "resolution": resolution
     }
     validation_data = DataFolder(
         validation_data,
@@ -243,10 +253,17 @@ def run(args):
 
     if xrnn is None:
         bins = np.logspace(-3, 3, 129)
-        model = Hydronn(
-            128, n_blocks, n_features_body,
-            n_layers_head, n_features_head
-        )
+        if resolution == 2:
+            model = Hydronn2(
+                128, n_blocks, n_features_body,
+                n_layers_head, n_features_head
+            )
+        else:
+            model = Hydronn4(
+                128, n_blocks, n_features_body,
+                n_layers_head, n_features_head
+            )
+
         xrnn = DRNN(model=model, bins=bins)
 
     model = xrnn.model

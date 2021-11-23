@@ -5,9 +5,12 @@ hydronn.results
 
 Functions for the post processing of the retrieval results.
 """
+from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
 import xarray as xr
+
+from rich.progress import track
 
 from hydronn.utils import decompress_and_load
 
@@ -16,6 +19,12 @@ DATA_PATH = Path(__file__).parent / "files"
 
 GAUGE_COORDS = xr.open_dataset(DATA_PATH / "gauge_coordinates.nc")
 
+
+def process_file(filename):
+    x = GAUGE_COORDS.x
+    y = GAUGE_COORDS.y
+    data = decompress_and_load(filename)
+    return data.interp({"x": x, "y": y})
 
 def interpolate_results(result_path):
     """
@@ -33,14 +42,23 @@ def interpolate_results(result_path):
         to the gauge locations.
     """
     result_path = Path(result_path)
-    x = GAUGE_COORDS.x
-    y = GAUGE_COORDS.y
 
     files = sorted(list(result_path.glob("**/*.nc.gz")))
     results = []
-    for f in files[:10]:
-        data = decompress_and_load(f)
-        results.append(data.interp({"x": x, "y": y}))
+
+    pool = ProcessPoolExecutor(max_workers=4)
+
+    tasks = [pool.submit(process_file, f) for f in files]
+    for f in files:
+        pool.submit(process_file, f)
+
+    for t, f in track(list(zip(tasks, files))):
+        data = t.result()
         print(f"Done processing {f}.")
+        if "n_inputs" in data.variables:
+            data = data.drop("n_inputs")
+        results.append(data)
+
+
     return xr.concat(results, "time")
 
