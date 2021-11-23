@@ -187,9 +187,9 @@ class Hydronn4(nn.Module):
         n_features_hi_res = n_features_body // 16
         n_features_med_res = n_features_body // 4
 
-        self.hi_res_in = nn.AvgPool2D(8, 8)
-        self.med_res_in = nn.AvgPool2D(4, 4)
-        self.low_res_in = nn.AvgPool2D(2, 2)
+        self.hi_res_in = nn.AvgPool2d(8, 8)
+        self.med_res_in = nn.AvgPool2d(4, 4)
+        self.low_res_in = nn.AvgPool2d(2, 2)
 
         self.block_in = XceptionBlock(
             16, n_features_body, downsample=False
@@ -207,7 +207,7 @@ class Hydronn4(nn.Module):
         self.up_block_2 = UpsamplingBlock(n_features_body)
         self.up_block = UpsamplingBlock(n_features_body)
 
-        self.head = MLPHead(n_features_body,
+        self.head = MLPHead(n_features_body + 16,
                             n_features_head,
                             n_outputs,
                             n_layers_head)
@@ -235,6 +235,6 @@ class Hydronn4(nn.Module):
         x_8_u = self.up_block_8(x_16_u, x_8)
         x_4_u = self.up_block_4(x_8_u, x_4)
         x_2_u = self.up_block_2(x_4_u, x_2)
-        x_u = self.up_block(x_2_u, x_in)
+        x_u = self.up_block(x_2_u, x)
 
-        return self.head(x)
+        return self.head(torch.cat([x_u, x_in], axis=1))
