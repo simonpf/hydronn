@@ -117,10 +117,10 @@ class HydronnDataset:
             data[f"C{i:02}"].astype(np.float32)
             for i in [4] + list(range(6, 17))
         ], axis=1)
-        surface_precip = data.surface_precip.data.astype(np.float32)
-        surface_precip = np.nan_to_num(surface_precip, nan=-1)
+        surface_precip = data.surface_precip.data.astype(np.float32).copy()
         if self.resolution > 2:
             surface_precip = surface_precip[:, ::2, ::2]
+        surface_precip = np.nan_to_num(surface_precip, nan=-1)
 
         data.close()
 
