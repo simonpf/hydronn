@@ -130,7 +130,9 @@ def run(args):
     device = args.device
 
     for f, o in zip(input_files, output_files):
+        print(f, o)
         if not o.exists():
+            print(f"File '{f}' doesn't exist. continuing.")
             retrieval = Retrieval([f],
                                   model,
                                   normalizer,

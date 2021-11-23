@@ -192,7 +192,7 @@ class Hydronn4(nn.Module):
         self.low_res_in = nn.AvgPool2D(2, 2)
 
         self.block_in = XceptionBlock(
-            16, n_features_body, downsample=False)
+            16, n_features_body, downsample=False
         )
 
         self.down_block_2 = DownsamplingBlock(n_features_body, n_blocks[0])
