@@ -130,8 +130,8 @@ def run(args):
     device = args.device
 
     for f, o in zip(input_files, output_files):
-        print(f, o)
-        if not o.exists():
+        o_c = Path(str(o) + ".gz")
+        if not (o.exists() or o_c.exists()):
             print(f"File '{f}' doesn't exist. continuing.")
             retrieval = Retrieval([f],
                                   model,

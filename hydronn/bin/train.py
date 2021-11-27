@@ -229,7 +229,7 @@ def run(args):
         dataset_factory,
         queue_size=32,
         kwargs=kwargs,
-        n_workers=2
+        n_workers=1
     )
 
     ###############################################################################
