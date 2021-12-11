@@ -67,6 +67,12 @@ def add_parser(subparsers):
         '--subset', metavar='even / odd', type=str,
         help='Retrieve only even or odd days.'
     )
+    parser.add_argument(
+        '--correction', metavar='path', type=str,
+        help='Optional path to correction file to apply.',
+        default=None
+    )
+
     parser.set_defaults(func=run)
 
 def run(args):
@@ -128,6 +134,13 @@ def run(args):
     tile_size = args.tile_size
     overlap = args.overlap
     device = args.device
+    correction = args.correction
+    if not Path(correction).exists():
+        LOGGER.error(
+            "The provided correction file '%s' doesn't exist.",
+            correction
+        )
+        return 1
 
     for f, o in zip(input_files, output_files):
         o_c = Path(str(o) + ".gz")
@@ -138,7 +151,8 @@ def run(args):
                                   normalizer,
                                   tile_size=tile_size,
                                   overlap=overlap,
-                                  device=device)
+                                  device=device,
+                                  correction=correction)
             results = retrieval.run()
             if not o.parent.exists():
                 o.parent.mkdir(parents=True)
