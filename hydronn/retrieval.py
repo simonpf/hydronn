@@ -534,10 +534,10 @@ class Retrieval:
             )
 
             results["mean_dep_c"] = (dims, mean_dep_c)
-            results["sample_dep_c"] = (dims, sample_dep_c),
+            results["sample_dep_c"] = (dims, sample_dep_c)
             results["quantiles_dep_c"] = (dims + ("quantiles",), quantiles_dep_c)
             results["mean_indep_c"] = (dims, mean_indep_c)
-            results["sample_indep_c"] = (dims, sample_indep_c),
+            results["sample_indep_c"] = (dims, sample_indep_c)
             results["quantiles_indep_c"] = (dims + ("quantiles",), quantiles_indep_c)
 
         return results
