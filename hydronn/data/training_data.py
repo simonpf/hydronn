@@ -5,6 +5,7 @@ hydronn.data.training_data
 
 Defines a dataset class to load the training data.
 """
+import logging
 import random
 
 import numpy as np
@@ -14,6 +15,9 @@ import xarray as xr
 from quantnn.normalizer import MinMaxNormalizer
 
 from hydronn.utils import decompress_and_load
+
+
+LOGGER = logging.getLogger(__name__)
 
 
 class HydronnDataset:
@@ -124,10 +128,14 @@ class HydronnDataset:
 
         data.close()
 
-        self.hi_res = hi_res
-        self.med_res = med_res
-        self.low_res = low_res
-        self.surface_precip = surface_precip
+ 
+        valid = np.any(np.isfinite(surface_precip, (-2, -1)))
+        LOGGER.info("Loaded %s valid samples: %s", valid.sum(), surface_precip.shape)
+
+        self.hi_res = hi_res[valid]
+        self.med_res = med_res[valid]
+        self.low_res = low_res[valid]
+        self.surface_precip = surface_precip[valid]
 
         if self.augment:
             n_scenes = self.hi_res.shape[0]
