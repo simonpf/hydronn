@@ -128,8 +128,10 @@ class HydronnDataset:
 
         data.close()
 
- 
-        valid = np.any(np.isfinite(surface_precip, (-2, -1)))
+        valid = np.any(np.isfinite(hi_res), (-3, -2, -1))
+        valid *= np.any(np.isfinite(med_res), (-3, -2, -1))
+        valid *= np.any(np.isfinite(low_res), (-3, -2, -1))
+        print(valid.sum())
         LOGGER.info("Loaded %s valid samples: %s", valid.sum(), surface_precip.shape)
 
         self.hi_res = hi_res[valid]
