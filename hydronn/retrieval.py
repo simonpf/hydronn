@@ -53,7 +53,7 @@ class AprioriCorrection:
         i = min(p_dep.ndim - 1, 1)
         shape[i] = self.n_bins
         ratios_dep = self.ratios_dep.reshape(shape).to(p_dep.device)
-        ratios_indep = self.ratios_dep.reshape(shape).to(p_indep.device)
+        ratios_indep = self.ratios_indep.reshape(shape).to(p_indep.device)
         return (p_dep * ratios_dep, p_indep * ratios_indep)
 
 
@@ -357,6 +357,7 @@ class Retrieval:
         device = self.device
 
         bins = torch.Tensor(self.model.bins).to(device)
+        d_bins = bins[1:] - bins[:-1]
 
         model = self.model.model.to(device)
 
@@ -455,8 +456,8 @@ class Retrieval:
                             y_pred_dep,
                             y_pred_indep
                         )
-                        y_pred_dep_c = qd.normalize(y_pred_dep_c, bins, 1)
-                        y_pred_indep_c = qd.normalize(y_pred_indep_c, bins, 1)
+                        y_pred_dep_c = qd.normalize(y_pred_dep_c * d_bins, bins, 1, False)
+                        y_pred_indep_c = qd.normalize(y_pred_indep_c, bins, 1, False)
                         sample_dep_c[-1].append(qd.sample_posterior(
                             y_pred_dep_c, bins
                         ).cpu().numpy()[:, 0])
