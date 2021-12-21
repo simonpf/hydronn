@@ -456,8 +456,8 @@ class Retrieval:
                             y_pred_dep,
                             y_pred_indep
                         )
-                        y_pred_dep_c = qd.normalize(y_pred_dep_c, bins, 1, False)
-                        y_pred_indep_c = qd.normalize(y_pred_indep_c, bins, 1, False)
+                        y_pred_dep_c = qd.normalize(y_pred_dep_c, bins, 1, True)
+                        y_pred_indep_c = qd.normalize(y_pred_indep_c, bins, 1, True)
                         sample_dep_c[-1].append(qd.sample_posterior(
                             y_pred_dep_c, bins
                         ).cpu().numpy()[:, 0])
