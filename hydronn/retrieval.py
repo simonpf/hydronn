@@ -19,6 +19,7 @@ from hydronn.data.goes import (LOW_RES_CHANNELS,
                                COL_START,
                                COL_END)
 from hydronn.utils import decompress_and_load
+from hydronn.data.training_data import HydronnDataset
 
 
 class AprioriCorrection:
@@ -30,10 +31,10 @@ class AprioriCorrection:
         ratio_data = xr.load_dataset(ratio_file)
         self.n_bins = ratio_data.bins.size
         self.ratios_dep = torch.Tensor(
-            ratio_data.ratios_dep.data.astype(np.float16)
+            ratio_data.ratios_dep.data.astype(np.float32)
         )
         self.ratios_indep = torch.Tensor(
-            ratio_data.ratios_indep.data.astype(np.float16)
+            ratio_data.ratios_indep.data.astype(np.float32)
         )
 
     def __call__(self, p_dep, p_indep):
@@ -552,3 +553,110 @@ class Retrieval:
         for f in self.input_files:
             results.append(self._run_file(f))
         return xr.concat(results, "time")
+
+
+class Evaluator:
+    """
+    Processor class to evaluate the Hydronn model on test data.
+    """
+    def __init__(self,
+                 input_files,
+                 model,
+                 normalizer,
+                 device="cuda"):
+        """
+        Args:
+            input_files: The list of input files for which to run the
+                retrieval.
+            model: The model to use for the retrieval.
+            normalizer: The normalizer object to use to normalize the
+                inputs.
+            device: The device on which to run the retrieval.
+        """
+        self.input_files = sorted(input_files)
+        self.model = model
+        self.normalizer = normalizer
+        self.device = device
+
+    def _run_file(self, input_file):
+        """
+        This function implements the evaluation for a single training data file.
+
+        Args:
+            input_file: Filename of the training data file.
+
+        Returns:
+            A 'xarray.Dataset' containing the results of the evaluation.
+        """
+        input_data = HydronnDataset(
+            input_file,
+            normalizer=self.normalizer,
+            batch_size=32
+        )
+        tau = [
+            0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6,
+            0.7, 0.8, 0.9, 0.95, 0.99, 0.999
+        ]
+        device = self.device
+
+        bins = torch.Tensor(self.model.bins).to(device)
+        model = self.model.model.to(device)
+
+        means = []
+        quantiles = []
+        samples = []
+        truth = []
+
+        for i in range(len(input_data)):
+            with torch.no_grad():
+                x, y = input_data[i]
+                x = [t.to(device) for t in x]
+                y_pdf = model(x)
+                y_pdf = self.model._post_process_prediction(
+                    y_pdf,
+                    bins
+                )
+
+                # Posterior mean
+                y_mean = qd.posterior_mean(y_pdf, bins=bins)
+                means.append(y_mean.cpu().numpy())
+
+                # Quantiles
+                y_quants = qd.posterior_quantiles(y_pdf,
+                                                  quantiles=tau,
+                                                  bins=bins)
+                quantiles.append(y_quants.cpu().numpy().transpose([0, 2, 3, 1]))
+
+                # Samples
+                y_samples = qd.sample_posterior(y_pdf, bins=bins)
+                samples.append(y_samples.cpu().numpy()[:, 0])
+
+                truth.append(y.cpu().numpy())
+
+        means = np.concatenate(means)
+        quantiles = np.concatenate(quantiles)
+        samples = np.concatenate(samples)
+        truth = np.concatenate(truth)
+
+        print(means.shape)
+        print(quantiles.shape)
+        print(samples.shape)
+        print(truth.shape)
+
+        dims = ("samples", "x", "y")
+        results = xr.Dataset({
+            "surface_precip": (dims, means),
+            "surface_precip_quantiles": (dims + ("quantiles",), quantiles),
+            "surface_precip_samples": (dims, samples),
+            "surface_precip_true": (dims, truth)
+        })
+        return results
+
+    def run(self):
+        """
+        Run retrieval and return results as 'xarray.Dataset'.
+        """
+        results = []
+        for f in self.input_files:
+            results.append(self._run_file(f))
+        return xr.concat(results, "samples")
