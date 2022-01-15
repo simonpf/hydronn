@@ -135,7 +135,7 @@ def run(args):
     overlap = args.overlap
     device = args.device
     correction = args.correction
-    if not Path(correction).exists():
+    if correction is not None and not Path(correction).exists():
         LOGGER.error(
             "The provided correction file '%s' doesn't exist.",
             correction
