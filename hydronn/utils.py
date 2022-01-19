@@ -5,6 +5,9 @@ hydronn.utils
 
 Various utility functions.
 """
+import io
+import gzip
+
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm, Normalize
 from pathlib import Path
@@ -49,25 +52,36 @@ def decompress_and_load(filename):
             raise ValueError(
                 f"The file '{filename}' doesn't exist. "
             )
+        elif Path(filename).suffix == ".lz4":
+            raise ValueError(
+                f"The file '{filename}' doesn't exist. "
+            )
         else:
             filename_gz = Path(str(filename) + ".gz")
             if not filename_gz.exists():
-                raise ValueError(
-                    f"Neither the file '{filename}' nor '{filename}.gz' exist."
-            )
-            filename = filename_gz
+                filename_lz4 = Path(str(filename) + ".lz4")
+                if not filename_lz4.exists():
+                    raise ValueError(
+                        f"Neither the file '{filename}' nor '{filename}.gz' exist."
+                    )
+                filename = filename_lz4
+            else:
+                filename = filename_gz
 
     if Path(filename).suffix == ".gz":
-        with TemporaryDirectory() as tmp:
-            tmpfile = Path(tmp) / filename.stem
-            with open(tmpfile, "wb") as decompressed:
-                subprocess.run(
-                    ["gunzip", "-c", str(filename)],
-                    stdout=decompressed,
-                    check=True
-                )
-            data = xr.load_dataset(tmpfile)
-            Path(tmpfile).unlink()
+        decompressed = io.BytesIO()
+        args = ["gunzip", "-c", str(filename)]
+        with subprocess.Popen(args, stdout=subprocess.PIPE) as proc:
+            decompressed.write(proc.stdout.read())
+        decompressed.seek(0)
+        data = xr.load_dataset(decompressed, engine="h5netcdf")
+    elif Path(filename).suffix == ".lz4":
+        decompressed = io.BytesIO()
+        args = ["unlz4", str(filename)]
+        with subprocess.Popen(args, stdout=subprocess.PIPE) as proc:
+            decompressed.write(proc.stdout.read())
+        decompressed.seek(0)
+        data = xr.load_dataset(decompressed, engine="h5netcdf")
     else:
         data = xr.open_dataset(filename)
     return data
@@ -173,3 +187,18 @@ def plot_sample(x, y, n=3):
             )
         except:
             pass
+
+def adapt_gauge_precip(precip):
+    result = precip.copy()
+    zeros = precip < 0.2
+    result[zeros] = np.random.uniform(1e-3, 5e-3, size=zeros.sum())
+    non_zeros = precip >= 0.2
+    result[non_zeros] += np.random.uniform(-0.1, 0.1, size=non_zeros.sum())
+    return result
+
+def load_style():
+    """
+    Load hydronn plotting style.
+    """
+    path = Path(__file__).parent / "files" / "hydronn.mplstyle"
+    plt.style.use(path)

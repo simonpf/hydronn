@@ -112,6 +112,11 @@ def add_parser(subparsers):
         action="store_true",
         help='Disable learning rate schedule.'
     )
+    parser.add_argument(
+        "--ir",
+        action="store_false",
+        help=("Whether to train an IR only retrieval.")
+    )
 
     # Other
     parser.add_argument(
@@ -141,7 +146,7 @@ def run(args):
     from quantnn.transformations import LogLinear
     from quantnn.models.pytorch.logging import TensorBoardLogger
     from quantnn.metrics import ScatterPlot
-    from hydronn.models import Hydronn2, Hydronn4
+    from hydronn.models import Hydronn2, Hydronn4, Hydronn4IR
     from hydronn.data.training_data import HydronnDataset
     from hydronn.definitions import HYDRONN_DATA_PATH
     from torch import optim
@@ -155,11 +160,13 @@ def run(args):
 
     # Check output path and define model name if necessary.
     output = Path(args.output[0])
+
     if output.is_dir() and not output.exists():
         LOGGER.error(
             "The output path '%s' doesn't exist.", output
         )
         return 1
+
     if not output.is_dir() and not output.parent.exists():
         LOGGER.error(
             "The output path '%s' doesn't exist.", output.parent
@@ -171,6 +178,7 @@ def run(args):
     n_features_body = args.n_features_body
     n_layers_head = args.n_features_head
     n_features_head = args.n_features_head
+    ir = args.ir
 
     if output.is_dir():
         network_name = (
@@ -209,7 +217,8 @@ def run(args):
         "batch_size": batch_size,
         "normalizer": normalizer,
         "augment": True,
-        "resolution": resolution
+        "resolution": resolution,
+        "ir": ir
     }
     training_data = DataFolder(
         training_data,
@@ -222,7 +231,8 @@ def run(args):
         "batch_size": 4 * batch_size,
         "normalizer": normalizer,
         "augment": False,
-        "resolution": resolution
+        "resolution": resolution,
+        "ir": ir
     }
     validation_data = DataFolder(
         validation_data,
@@ -259,10 +269,16 @@ def run(args):
                 n_layers_head, n_features_head
             )
         else:
-            model = Hydronn4(
-                128, n_blocks, n_features_body,
-                n_layers_head, n_features_head
-            )
+            if ir:
+                model = Hydronn4IR(
+                    128, n_blocks, n_features_body,
+                    n_layers_head, n_features_head
+                )
+            else:
+                model = Hydronn4(
+                    128, n_blocks, n_features_body,
+                    n_layers_head, n_features_head
+                )
 
         xrnn = DRNN(model=model, bins=bins)
 

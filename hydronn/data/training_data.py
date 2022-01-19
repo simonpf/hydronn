@@ -32,7 +32,8 @@ class HydronnDataset:
                  normalize=True,
                  normalizer=None,
                  augment=True,
-                 resolution=2):
+                 resolution=2,
+                 ir=False):
         """
         Load training data.
 
@@ -53,6 +54,7 @@ class HydronnDataset:
         self.shuffle = shuffle
         self.augment = augment
         self.resolution = resolution
+        self.ir = ir
 
         seed = random.SystemRandom().randint(0, 2 ** 16)
         self.rng = np.random.default_rng(seed)
@@ -128,10 +130,13 @@ class HydronnDataset:
 
         data.close()
 
-        valid = np.any(np.isfinite(hi_res), (-3, -2, -1))
-        valid *= np.any(np.isfinite(med_res), (-3, -2, -1))
-        valid *= np.any(np.isfinite(low_res), (-3, -2, -1))
-        print(valid.sum())
+        if self.ir:
+            valid = np.any(np.isfinite(low_res[:, -4]), (-2, -1))
+        else:
+            valid = np.any(np.isfinite(hi_res), (-3, -2, -1))
+            valid += np.any(np.isfinite(med_res), (-3, -2, -1))
+            valid += np.any(np.isfinite(low_res), (-3, -2, -1))
+
         LOGGER.info("Loaded %s valid samples: %s", valid.sum(), surface_precip.shape)
 
         self.hi_res = hi_res[valid]

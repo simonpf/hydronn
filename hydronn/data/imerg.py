@@ -13,14 +13,34 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 
-class ImergFile:
+from hydronn.definitions import ROI
 
+class ImergFile:
+    """
+    Interface class to read IMERG data.
+    """
     @classmethod
     def load_files(cls,
                    path,
                    start_time=None,
                    end_time=None,
                    roi=None):
+        """
+        Load all files from a given folder and concatenate results.
+
+        Args:
+            path: Path pointing to a folder containing the IMERG files.
+            start_time: If given, can be used to specify the beginning
+                of a time range for which to the files.
+            end_time: If given, can be used to specify the end of a time range
+                for which to read the files.
+            roi: A region of interest (ROI) given by the coordinates of its
+                corners ``(lon_ll, lat_ll, lon_ur, lat_ur)``.
+
+        Return:
+            A 'xarray.Dataset' containing the data from the loaded files
+            concatenated along the time dimension.
+        """
         path = Path(path)
         files = list(path.glob("3B-HHR.MS.MRG*.HDF5"))
 
@@ -58,7 +78,19 @@ class ImergFile:
 
 
     def to_xarray_dataset(self, roi=None):
+        """
+        Load data into 'xarray.Dataset'.
 
+        Args:
+           roi: If given, should contain the coordinates
+               ``(lon_ll, lat_ll, lon_ur, lat_ur)`` of a
+               rectangular bounding box to which the loaded
+               will be restricted.
+
+        Return:
+            A 'xarray.Dataset' containing the loaded data from the
+            file.
+        """
         data = File(str(self.filename), "r")
         lats = data["Grid/lat"][:]
         lons = data["Grid/lon"][:]
@@ -97,3 +129,69 @@ class ImergFile:
         })
 
         return dataset
+
+
+def load_and_interpolate_data(path, gauge_data):
+    """
+    Load and interpolate IMERG data to gauge coordinates.
+
+    Args:
+        path: Path to the folder containing the IMERG data.
+        gauge_data: xarray.Dataset containing the gauge data.
+
+    Return:
+       xarray.Dataset containing the loaded IMERG data interpolated
+       to the coordinates of the gauges.
+    """
+    files = sorted(list(Path(path).glob("*.HDF5")))
+    datasets = []
+    for filename in files:
+        print(filename)
+        data = ImergFile(filename).to_xarray_dataset(roi=ROI)
+        datasets.append(data.interp({
+            "latitude": gauge_data.latitude,
+            "longitude": gauge_data.longitude,
+        }))
+    dataset = xr.concat(datasets, dim="time")
+    return dataset
+
+
+def calculate_accumulations(path):
+    """
+    Calculate accumulated precipitation.
+
+    Args:
+        path: Path to the folder containing the IMERG data.
+
+    Return:
+       xarray.Dataset containing the IMERG data accumulated
+       over the range of available files.
+    """
+    files = sorted(list(Path(path).glob("*.HDF5")))
+    results = None
+    for filename in files:
+        print(filename)
+        data = ImergFile(filename).to_xarray_dataset(roi=ROI)
+        if results is None:
+            precip = data.surface_precip.data[0]
+            counts = 0.5 * (precip >= 0).astype(np.float32)
+            lons = data.longitude.data
+            lats = data.latitude.data
+
+            results = xr.Dataset({
+                "latitude": (("latitude",), lats),
+                "longitude": (("longitude",), lons),
+                "counts": (("longitude", "latitude"), counts),
+                "surface_precip": (("longitude", "latitude"), precip),
+            })
+        else:
+            precip = data.surface_precip.data[0]
+            counts = 0.5 * (precip >= 0).astype(np.float32)
+            results.surface_precip.data += 0.5 * precip
+            results.counts.data += 0.5 * (precip >= 0).astype(np.float32)
+
+    results = results.rename({"surface_precip": "surface_precip_acc"})
+    mean = results.surface_precip_acc.data / results.counts.data
+    results["surface_precip_mean"] = (("longitude", "latitude"), mean)
+
+    return results

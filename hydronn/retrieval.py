@@ -563,7 +563,8 @@ class Evaluator:
                  input_files,
                  model,
                  normalizer,
-                 device="cuda"):
+                 device="cuda",
+                 resolution=2):
         """
         Args:
             input_files: The list of input files for which to run the
@@ -577,6 +578,7 @@ class Evaluator:
         self.model = model
         self.normalizer = normalizer
         self.device = device
+        self.resolution = resolution
 
     def _run_file(self, input_file):
         """
@@ -591,7 +593,8 @@ class Evaluator:
         input_data = HydronnDataset(
             input_file,
             normalizer=self.normalizer,
-            batch_size=32
+            batch_size=32,
+            resolution=self.resolution
         )
         tau = [
             0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6,

@@ -10,6 +10,7 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 import scipy
+from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import interp1d
 
 
@@ -60,11 +61,14 @@ def load_file(filename, correction=None):
     """
     M = 1613
     N = 1349
-    precip = np.fromfile(filename, dtype="u2").reshape((M, N)) / 10.0
-    precip = precip[::-1, :]
-
-    if correction is not None:
-        precip = correction(precip)
+    try:
+        precip = np.fromfile(filename, dtype="u2").reshape((M, N))
+        precip = precip.astype(np.float32) / 10.0
+        precip = precip[::-1, :]
+        if correction is not None:
+            precip = correction(precip)
+    except ValueError:
+        precip = np.nan * np.ones((M, N), dtype=np.float32)
 
     return precip
 
@@ -79,6 +83,7 @@ def get_lats_and_lons():
         corresponding to the hydroestimator grid.
     """
     M = 1613
+    N = 1349
     # Calculate latitudes.
     lat_0 = -44.95
     d_lat = 0.0359477
@@ -139,5 +144,93 @@ def load_data(data_path):
         "longitude": longitude,
         "time": time,
         "surface_precip": (("time", "latitude", "longitude"), data)
+    })
+    return dataset
+
+
+
+
+def load_and_interpolate_data(data_path, gauge_data, correction=None):
+    """
+    Calculated accumulated and mean precipitation for the hydroestimator data.
+
+    Args:
+        data_path: Folder containing the hydroestimator files to load.
+
+    Return:
+        A 'xarray.Dataset' containing  accumulated and mean precipitation.
+    """
+    if correction is not None:
+        correction = Correction(correction)
+
+    files = sorted(list(Path(data_path).glob("*.bin")))
+
+    latitude, longitude = get_lats_and_lons()
+    m = latitude.size
+    n = longitude.size
+    values = np.zeros((m, n), dtype=np.float32)
+
+    interpolator = RegularGridInterpolator(
+        (latitude, longitude), values, bounds_error=False
+    )
+    x = np.stack((gauge_data.latitude.data, gauge_data.longitude.data), axis=-1)
+
+    precip = []
+    times = []
+
+    for f in files:
+        times.append(get_date(f))
+        data = load_file(f, correction=correction)
+        interpolator.values = data
+        precip.append(interpolator(x))
+        print(f)
+
+    times = np.stack(times)
+    precip = np.stack(precip, axis=-1)
+
+    dataset = xr.Dataset({
+        "gauges": (("gauges",), gauge_data.gauges.data),
+        "time": (("time",), times),
+        "surface_precip": (("gauges", "time"), precip)
+    })
+    return dataset
+
+
+def calculate_accumulations(data_path, correction=None):
+    """
+    Calculated accumulated and mean precipitation for the hydroestimator data.
+
+    Args:
+        data_path: Folder containing the hydroestimator files to load.
+        correction: Path to a text file specifying a quantile matching
+            correction for the Hydroestimator data.
+
+    Return:
+        A 'xarray.Dataset' containing  accumulated and mean precipitation.
+    """
+    if correction is not None:
+        correction = Correction(correction)
+
+    files = sorted(list(Path(data_path).glob("*.bin")))
+
+    latitude, longitude = get_lats_and_lons()
+    m = latitude.size
+    n = longitude.size
+    acc = np.zeros((m, n), dtype=np.float32)
+    counts = np.zeros((m, n), dtype=np.float32)
+
+    for f in files:
+        data = load_file(f, correction=correction)
+        data = np.nan_to_num(data, 0.0)
+        acc += data
+        counts += (data >= 0).astype(np.float32)
+
+    mean = acc / counts
+    dataset = xr.Dataset({
+        "latitude": latitude,
+        "longitude": longitude,
+        "surface_precip_acc": (("latitude", "longitude"), acc),
+        "surface_precip_mean": (("latitude", "longitude"), mean),
+        "counts": (("latitude", "longitude"), counts)
     })
     return dataset
