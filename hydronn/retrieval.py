@@ -428,7 +428,11 @@ class Retrieval:
                         else:
                             y_pred_dep = y_pred_dep + (1 / n_inputs) * y_pred
                             y_pred_indep = qd.add(
-                                y_pred_indep, bins, y_pred, bins, bins
+                                y_pred_indep / (k / (k + 1)),
+                                bins * (k / (k + 1)),
+                                y_pred * (k + 1),
+                                bins / (k + 1),
+                                bins
                             )
 
                     sample_dep[-1].append(qd.sample_posterior(
@@ -441,15 +445,14 @@ class Retrieval:
                         y_pred_dep, bins
                     ).cpu().numpy())
 
-                    y_pred_indep = n_inputs * y_pred_indep
                     sample_indep[-1].append(qd.sample_posterior(
-                        y_pred_indep, bins_acc
+                        y_pred_indep, bins
                     ).cpu().numpy()[:, 0])
                     quantiles_indep[-1].append(qd.posterior_quantiles(
-                        y_pred_indep, bins_acc, quantiles
+                        y_pred_indep, bins, quantiles
                     ).cpu().numpy().transpose([0, 2, 3, 1]))
                     mean_indep[-1].append(qd.posterior_mean(
-                        y_pred_indep, bins_acc
+                        y_pred_indep, bins
                     ).cpu().numpy())
 
                     if self.correction:
@@ -469,15 +472,14 @@ class Retrieval:
                         ).cpu().numpy())
 
                         y_pred_indep_c = qd.normalize(y_pred_indep_c, bins, 1, True)
-                        y_pred_indep = n_inputs * y_pred_indep
                         sample_indep_c[-1].append(qd.sample_posterior(
-                            y_pred_indep_c, bins_acc
+                            y_pred_indep_c, bins
                         ).cpu().numpy()[:, 0])
                         quantiles_indep_c[-1].append(qd.posterior_quantiles(
-                            y_pred_indep_c, bins_acc, quantiles
+                            y_pred_indep_c, bins, quantiles
                         ).cpu().numpy().transpose([0, 2, 3, 1]))
                         mean_indep_c[-1].append(qd.posterior_mean(
-                            y_pred_indep_c, bins_acc
+                            y_pred_indep_c, bins
                         ).cpu().numpy())
 
         # Finally, concatenate over rows and columns.
@@ -501,18 +503,22 @@ class Retrieval:
         )
 
         dims = ("time", "x", "y")
+        dims_r = ("time", "x", "y")
+        if mean_dep.shape[-2] != input_data.data.x.size:
+            dims_r = ("time", "x_4", "y_4")
+
         results = xr.Dataset({
             "time":  ("time", input_data.data.time.mean("time").data.reshape((1,))),
             "n_inputs": (("time",), [n_inputs]),
             "latitude": input_data.data.latitude.mean("time"),
             "longitude": input_data.data.longitude.mean("time"),
             "quantiles": (("quantiles",), quantiles),
-            "mean_dep": (dims, mean_dep),
-            "sample_dep": (dims, sample_dep),
-            "quantiles_dep": (dims + ("quantiles",), quantiles_dep),
-            "mean_indep": (dims, mean_indep),
-            "sample_indep": (dims, sample_indep),
-            "quantiles_indep": (dims + ("quantiles",), quantiles_indep)
+            "mean_dep": (dims_r, mean_dep),
+            "sample_dep": (dims_r, sample_dep),
+            "quantiles_dep": (dims_r + ("quantiles",), quantiles_dep),
+            "mean_indep": (dims_r, mean_indep),
+            "sample_indep": (dims_r, sample_indep),
+            "quantiles_indep": (dims_r + ("quantiles",), quantiles_indep)
         })
 
         if self.correction:
@@ -536,12 +542,12 @@ class Retrieval:
                 [np.concatenate(r, -1) for r in mean_indep_c], -2
             )
 
-            results["mean_dep_c"] = (dims, mean_dep_c)
-            results["sample_dep_c"] = (dims, sample_dep_c),
-            results["quantiles_dep_c"] = (dims + ("quantiles",), quantiles_dep_c)
-            results["mean_indep_c"] = (dims, mean_indep_c)
-            results["sample_indep_c"] = (dims, sample_indep_c),
-            results["quantiles_indep_c"] = (dims + ("quantiles",), quantiles_indep_c)
+            results["mean_dep_c"] = (dims_r, mean_dep_c)
+            results["sample_dep_c"] = (dims_r, sample_dep_c)
+            results["quantiles_dep_c"] = (dims_r + ("quantiles",), quantiles_dep_c)
+            results["mean_indep_c"] = (dims_r, mean_indep_c)
+            results["sample_indep_c"] = (dims_r, sample_indep_c)
+            results["quantiles_indep_c"] = (dims_r + ("quantiles",), quantiles_indep_c)
 
         return results
 
