@@ -1,0 +1,718 @@
+%% Copernicus Publications Manuscript Preparation Template for LaTeX Submissions
+%% ---------------------------------
+%% This template should be used for copernicus.cls
+%% The class file and some style files are bundled in the Copernicus Latex Package, which can be downloaded from the different journal webpages.
+%% For further assistance please contact Copernicus Publications at: production@copernicus.org
+%% https://publications.copernicus.org/for_authors/manuscript_preparation.html
+
+
+%% Please use the following documentclass and journal abbreviations for preprints and final revised papers.
+
+%% 2-column papers and preprints
+\documentclass[journal abbreviation, manuscript]{copernicus}
+
+
+
+%% Journal abbreviations (please use the same for preprints and final revised papers)
+
+
+% Advances in Geosciences (adgeo)
+% Advances in Radio Science (ars)
+% Advances in Science and Research (asr)
+% Advances in Statistical Climatology, Meteorology and Oceanography (ascmo)
+% Annales Geophysicae (angeo)
+% Archives Animal Breeding (aab)
+% Atmospheric Chemistry and Physics (acp)
+% Atmospheric Measurement Techniques (amt)
+% Biogeosciences (bg)
+% Climate of the Past (cp)
+% DEUQUA Special Publications (deuquasp)
+% Drinking Water Engineering and Science (dwes)
+% Earth Surface Dynamics (esurf)
+% Earth System Dynamics (esd)
+% Earth System Science Data (essd)
+% E&G Quaternary Science Journal (egqsj)
+% European Journal of Mineralogy (ejm)
+% Fossil Record (fr)
+% Geochronology (gchron)
+% Geographica Helvetica (gh)
+% Geoscience Communication (gc)
+% Geoscientific Instrumentation, Methods and Data Systems (gi)
+% Geoscientific Model Development (gmd)
+% History of Geo- and Space Sciences (hgss)
+% Hydrology and Earth System Sciences (hess)
+% Journal of Bone and Joint Infection (jbji)
+% Journal of Micropalaeontology (jm)
+% Journal of Sensors and Sensor Systems (jsss)
+% Magnetic Resonance (mr)
+% Mechanical Sciences (ms)
+% Natural Hazards and Earth System Sciences (nhess)
+% Nonlinear Processes in Geophysics (npg)
+% Ocean Science (os)
+% Polarforschung - Journal of the German Society for Polar Research (polf)
+% Primate Biology (pb)
+% Proceedings of the International Association of Hydrological Sciences (piahs)
+% Safety of Nuclear Waste Disposal (sand)
+% Scientific Drilling (sd)
+% SOIL (soil)
+% Solid Earth (se)
+% The Cryosphere (tc)
+% Weather and Climate Dynamics (wcd)
+% Web Ecology (we)
+% Wind Energy Science (wes)
+
+
+%% \usepackage commands included in the copernicus.cls:
+%\usepackage[german, english]{babel}
+%\usepackage{tabularx}
+%\usepackage{cancel}
+%\usepackage{multirow}
+%\usepackage{supertabular}
+%\usepackage{algorithmic}
+%\usepackage{algorithm}
+%\usepackage{amsthm}
+%\usepackage{float}
+%\usepackage{subfig}
+%\usepackage{rotating}
+
+\newcommand{\hydronntwo}{Hydronn$_{2}$}
+\newcommand{\hydronnfourall}{Hydronn$_{4}$}
+\newcommand{\hydronnfourir}{Hydronn$_{4, \text{IR}}$}
+
+\begin{document}
+
+\title{An improved nowcasting precipitation retrieval for Brazil}
+
+
+% \Author[affil]{given_name}{surname}
+
+\Author[1]{Simon}{Pfreundschuh}
+\Author[1]{Ingrid}{Ingemarsson}
+\Author[1]{Patrick}{Eriksson}
+\Author[1]{Daniel Alejandor}{Vila}
+\Author[1]{Alan}{Calheiros}
+
+\affil[1]{Department of Space, Earth and Environment, Chalmers University of Technology, 41296 Gothenburg, Sweden}
+
+%% The [] brackets identify the author with the corresponding affiliation. 1, 2, 3, etc. should be inserted.
+
+%% If an author is deceased, please mark the respective author name(s) with a dagger, e.g. "\Author[2,$\dag$]{Anton}{Smith}", and add a further "\affil[$\dag$]{deceased, 1 July 2019}".
+
+%% If authors contributed equally, please mark the respective author names with an asterisk, e.g. "\Author[2,*]{Anton}{Smith}" and "\Author[3,*]{Bradley}{Miller}" and add a further affiliation: "\affil[*]{These authors contributed equally to this work.}".
+
+
+\correspondence{Simon Pfreundschuh (simon.pfreundschuh@chalmers.se)}
+
+\runningtitle{An improved nowcasting rain retrieval for Brazil}
+
+\runningauthor{Simon Pfreundschuh}
+
+
+
+
+
+\received{}
+\pubdiscuss{} %% only important for two-stage journals
+\revised{}
+\accepted{}
+\published{}
+
+%% These dates will be inserted by Copernicus Publications during the typesetting process.
+
+
+\firstpage{1}
+
+\maketitle
+
+
+
+\begin{abstract}
+\end{abstract}
+
+
+\introduction  %% \introduction[modified heading if necessary]
+
+
+\section{Data and methods}
+
+This section introduces the rain gauge measurements that are used as reference
+data in this study together with the retrieval algorithms that the Hydronn
+retrieval will be evaluated against. Following this, the implementation of the
+hydronn retrieval is presented.
+
+\subsection{Rain gauge data}
+
+The rain gauge measurement that are used in this study were compiled by the
+Institute for Space Research (INPE) and consists of hourly gauge measurements
+covering the time range May 2000 until May 2020. From this data December of
+2020 will be used for the evaluation of the Hydronn retrieval while the data
+from 2018 and 2019 will be used to derive a priori corrections.
+
+The geographical distribution and the mean precipitation during December 2012 of
+gauges is displayed in Fig.~\ref{fig:gauges}. While the gauge density is fairly
+high on the south-western coast of Brazil it decreases markedly towards the
+North-West. The highest precipitation is observed on the lower-central west
+coast of the country extending into the north west. Very low precipitation rates
+are observed in the north east.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{../plots/gauges}
+  \caption{
+    Rain gauge data used in this study. Panel (a) displays the spatial
+    distribution of gauges by means of the number of gauges falling into
+    each hexagon. Hexagon-free areas are not covered by gauges. Panel (b)
+    shows the mean precipitation rate in each gauge.
+    }
+  \label{fig:gauges}
+\end{figure}
+    
+
+\subsection{HYDRO}
+
+HYDRO is the currently operational real-time precipitation retrieval at the
+Center for Weather Forecast and Climate Studies/National Institute for Space
+Research (CPTEC/INPE). It is based on the auto-estimator \citep{vicente98}, a
+semi-empirical retrieval technique using a power-law relationship between
+$10.8\ \unit{\mu m}$ IR brightness temperatures and correction factors taking
+into account moisture parameters and cloud structure. The current version of the
+retrieval is described in \citet{siqueira19}, which also introduces regional
+correction factors derived from a climatology of estimated surface precipitation
+from the radars of the Tropical Rainfall Measurement Mission (TRMM,
+\citeauthor{simpson96}, \citeyear{simpson96}) and GPM. For this study we use the
+corrected version of HYDRO proposed in \citet{siqueira19} with the regional
+corrections applied. As is was found to yield the most accurate results.
+
+\subsection{PERSIANN CSS}
+
+The PERSIANN Cloud Classification System (CCS, \citeauthor{hong04},
+\citeyear{hong04}) is another precipitation retrieval algorithm that uses IR
+observations from geostationary satellites to retrieve precipitation. It is
+included in this study as a reference dataset due to it being available globally
+at a 1-hour resolution. The algorithm is a fully empirical algorithm based on
+self-organizing maps, an early form of neural networks, that are used to
+classify cloud patches and associate them to power-law relationships, which are
+used to estimate the precipitation at each pixel. Although the global CCS
+dataset is currently being replaced by the updated PERSIANN Dynamic
+Infrared-Rain rate (PDIR-Now, \citeauthor{nguyen20}, \citeyear{nguyen20}) we
+decided not to use it due to the first half of the evaluation period missing
+from the online archive.
+
+
+\subsection{GPM IMERG}
+
+The Integrated Multi-satellite Retrievals for GPM (IMERG,
+\citeauthor{huffman15}, \citeyear{huffman15}) combines retrievals from PMW
+and IR observations as global rain gauge measurements to produce global,
+hourly measurements of precipitation. Due to its reliance on a wealth of
+measurement sources and the sophistication of the retrieval pipeline, the
+product can be considered one of the most accurate precipitation hourly
+precipitation products. 
+
+\subsection{Hydronn}
+
+Hydronn is a neural network based real time precipitation retrieval algorithm
+that uses IR and VIS observation from the GOES-16 geostrationary satellite. It
+has been developed specifically to retrieve precipitation over Brazil.
+
+\subsubsection{Training data}
+
+The training data for the Hydronn retrieval consists of co-locations of input
+observations from the GOES-16 ABI \citep{schmit18} and retrieved surface
+precipitation from the GPM combined product \citep{grecu16}. GOES ABI
+observations were extracted at their native resolutions and combined with the
+surface precipitation retrieved from the GPM combined product by mapping it to
+the $2\ \unit{km}$ resolution of the ABI's IR channels. Co-locations were
+extracted for the time span 2018-01-01 until 2021-09-01. Observations from the
+year 2020 were excluded from the training and are only used in the evaluation of
+the hydronn configurations.
+
+The distribution of precipitation rates in the training dataset is displayed in
+Fig.~\ref{fig:training_data}. The detection threshold for precipitation of the
+GPM radar between $0.2$ and $0.4\ \unit{mm h^{-1}$ is clearly visible in the
+  distributions. In addition to this, there is a moderate seasonal cycle, which
+  mainly impacts the likelihood of moderate precipitation. The gauge
+  measurements exhibit a stronger effect of the seasonal cycle especially for
+  strong rain. Despite those differences, it cannot be concluded that the
+  training and gauge data are inconsistent, since the differences may be due to
+  the satellite measurements corresponding to instantaneous measurements,
+  whereas the gauge measurements are accumulated over the span of an hour.
+
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{../plots/training_data_statistics}
+  \caption{
+    Distribution of reference precipitation rates. Panel (a) shows the
+    seasonal PDFs of precipitation rates in the training data. Panel (b)
+    shows the PDFs of precipitation rates measured by the gauges
+    over the time period covered by the training data. Grey lines in the
+    background trace the PDFs of the precipitation rates in the training data
+    shown in Panel (a).
+    }
+  \label{fig:training_data}
+\end{figure}
+
+
+\subsubsection{Retrieval configurations}
+
+The Hydronn retrieval has been implemented in three different configurations in
+order to assess how the choice of input observations and retrieval resolution
+affects the retrieval. The most basic retrieval configuration is the
+\hydronnfourir retrieval, which only uses the $10.7\ \unit{\mu\ m}$ channel.
+This configuration has the advantage of using only a single infrared channel,
+that is available from all currently operational geostationary
+satellites and most historical sensors. The reliance on IR observations alone has
+furthermore the advantage the information content of the input observation is
+independent of the availability of sunlight. Because of it's sensitivity to cloud
+top height this channel has a long history of being used in precipitation retrievals
+and is also the sole channel used by the HYDRO and PERSIANN CCS algorithms.
+
+The next configuration named \hydronnfourall uses all available GOES channels at
+a resolution of $4\ \unit{km}$ at zenith. Except for relying  more satellite
+observations as input data, this configuration  is identical to the \hydronnfourir
+configuration.
+
+The final configuration aims to exploit the full potential of GOES observations
+for precipitation retrievals. The input includes observations from all GOES
+channels at their native resolution while precipitation is retrieved at a
+resolution of $2\ \unit{km}$ at zenith. Since 
+
+\subsubsection{Neural network model}
+
+All Hydronn retrievals are based on a common convolutional neural network
+(CNN) architecture. An illustration of the architecture is provided in
+Fig.~\ref{fig:architecture}. 
+
+The posterior distribution of the retrieval is estimated by approximating the
+PDF of the posterior distribution. Following \citet{metnet}, this is achieved by
+discretizing the range of expected precipitation values and predicting for each
+bin the probability of the observed precipitation falling it. This is
+conveniently implemented by treating the retrieval as a classification problem
+and using a cross-entropy loss to train the networks. During inference, the logits
+predicted by the network are transformed into a probability density by applying
+a softmax activation and normalizing the bin probabilities.
+
+\subsubsection{Retrieval output}
+
+For each retrieved pixel, the predicted posterior distribution is used to derive
+the posterior mean, a sample of the posterior distribution and 14 quantiles of
+the posterior distribution. The 14 quantiles are retained as a more compact
+representation of the posterior distribution than the probabilities over the 128
+bins that are produced by the networks. In addition to providing a direct
+measure of retrieval uncertainty, the retained quantiles can be used to infer
+e.g. probabilities of the instantaneous rain rates exceeding certain thresholds.
+
+\subsubsection{Calculating precipitation accumulations}
+
+The precipitation distributions prediced by hydronn are instantaneous
+precipitaiton rates. Since GOES 16 imagery is available every 10 minutes. This
+raises the question how to integrate these distributions to hourly precipitation
+rates. The difficulty with this is that it is unclear how the retrieval
+uncertainties should be propagated in time. For this study, we have implemented
+two heuristics for doing this that represent different assumptions on the
+temporal correlation of the errors in the precipitation retrieval.
+
+The first approach is to average the predicted posterior distributions. For the
+case of multiple identical observations, this approach would conserve the
+retrieval uncertainties and may thus be viewed to correspond to a assuming a
+strong dependence between the retrieval errors for consecutive observations.
+
+The second approach is to assume independence of the retrieval uncertainty. For
+identical, consecutive observations this will cause the retrieval uncertainty to
+decay. Given the binned probability densities of two independent random
+variables, the PDF of their sum can be approximated by calculating weighted
+histograms of the outer sum of the bin centroids weighted by the product of the
+bin probabilities.
+
+For the evaluation of the Hydronn retrieval we calculate hourly accumulations
+the PDFs for hourly accumulations using both approaches. We then calculate the
+retrieval outputs described above. For each retrieval configuration two types of
+hourly accumulations are produced. One corresponding to assuming dependent
+retrieval error, which will we mark with '(dep.)' where necessary. And one
+corresponding to assuming independent retrieval errors, which we will mark with
+'(indep.)'. It should be noted, however, that this only affects the predicted
+retrieval uncertainties and not the predicted mean values.
+
+
+\begin{figure}
+  \centering
+  \includegraphics[width=0.8\textwidth]{../plots/correction_factors}
+  \caption{
+    A priori correction factors.
+    }
+  \label{fig:correction_factors}
+\end{figure}
+
+\section{Results}
+
+\subsection{Model evaluation}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{../plots/evaluation_scatter}
+  \caption{
+    Scatter plots of retrieved mean precipitation against true precipitation
+    for all retrieval configurations.
+    }
+  \label{fig:evaluation_scatter}
+\end{figure}
+
+
+\begin{table}
+  \caption{Error metrics on test dataset. Each row displays a selection of error
+     metrics for the different retrieval Hydronn configurations.}
+  \label{tab:evaluation_metrics}
+\begin{tabular}{l|rrrr}
+  Algorithm & Bias [$\unit{mm\ h^{-1}}$] & MAE [$\unit{mm\ h^{-1}}$] & MSE [$\unit{(mm\ h^{-1})^{2}}$]& CRPS [$\ $] \\
+  \hline
+  \hydronnfourall & 0.0006 & 0.1626 & 1.1848 & 0.0865 \\
+  \hydronntwo & -0.0001 & 0.1508 & 1.0827 & 0.0757 \\
+ \end{tabular} 
+\end{table}
+ 
+
+
+
+\subsection{Validation against rain gauge data}
+
+\subsubsection{Mean precipitation}
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{../plots/mean_precipitation}
+  \caption{
+    Mean precipitation during December 2020. Each panel shows for all evaluated
+    precipitation retrieval the mean precipitation in the background overlaid
+    with the symmetric percentage biases with respect to gauge measurements.
+    }
+  \label{fig:evaluation_scatter}
+\end{figure}
+
+
+
+\begin{table}
+  \caption{Error metrics for evaluation against Gauge data.}
+  \label{tab:metrics}
+\begin{tabular}{|l||r|r|r|r|}
+\hline
+  Algorithm & Bias & MSE & Correlation & SMAPE \\
+\hline
+\hline
+
+PERSIANN CCS & 0.0694 & 3.9312 & 0.0915 & 1.7260 \\ 
+\hline
+IMERG & 0.0189 & 2.1737 & 0.3842 & 1.2665 \\ 
+\hline
+HYDRO & 0.1015 & 4.3813 & 0.1258 & 1.6735 \\ 
+\hline
+Hydronn$_{2, \text{all}}$ & 0.0128 & 1.6814 & 0.5442 & 1.0159 \\ 
+\hline
+Hydronn$_{2, \text{all}}$ dep. (corr.) & -0.0236 & 1.7869 & 0.5152 & 1.0135 \\ 
+\hline
+Hydronn$_{2, \text{all}}$ indep. (corr.) & 0.0402 & 1.7049 & 0.5448 & 1.0254 \\ 
+\hline
+Hydronn$_{4, \text{all}}$ & -0.0522 & 1.9128 & 0.4622 & 1.1127 \\ 
+\hline
+Hydronn$_{4, \text{all}}$ dep. (corr.) & -0.0459 & 1.9175 & 0.4573 & 1.0979 \\ 
+\hline
+Hydronn$_{4, \text{all}}$ indep. (corr.) & 0.0210 & 1.9417 & 0.4537 & 1.1927 \\ 
+\hline
+\end{tabular}
+\end{table}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{../plots/rain_rate_distributions}
+  \caption{
+    Distributions of retrieved rain rates.
+    }
+  \label{fig:evaluation_scatter}
+\end{figure}
+
+\subsection{Uncertainty estimates}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{../plots/validation_calibration}
+  \caption{
+    Calibration of confidence intervals for retrieved precipitation.
+    }
+  \label{fig:evaluation_scatter}
+\end{figure}
+
+\subsection{Detection of high-impact events}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{../plots/validation_roc}
+  \caption{
+    Receiver operating characteristic (ROC) curves for the detection of precipitation
+    events with a precipitation rate larger than $10\ \unit{mm\ h^{-1}}$.
+    }
+  \label{fig:evaluation_scatter}
+\end{figure}
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{../plots/validation_classification_calibration}
+  \caption{
+    Calibration of the probabilistic precipitation event classification. 
+    }
+  \label{fig:evaluation_scatter}
+\end{figure}
+
+\subsection{Case study}
+
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{../plots/case_study}
+  \caption{
+    Retrieved precipitation for an extreme precipitation event near SP.
+    }
+  \label{fig:evaluation_scatter}
+\end{figure}
+
+\subsection{Daily cycle}
+
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{../plots/daily_cycle}
+  \caption{
+    Retrieved daily cycle of precipitation.
+    }
+  \label{fig:evaluation_scatter}
+\end{figure}
+%% It is strongly recommended to make use of these sections in case data sets and/or software code have been part of your research the article is based on.
+
+\codeavailability{TEXT} %% use this section when having only software code available
+
+
+\dataavailability{TEXT} %% use this section when having only data sets available
+
+
+\codedataavailability{TEXT} %% use this section when having data sets and software code available
+
+
+\sampleavailability{TEXT} %% use this section when having geoscientific samples available
+
+
+\videosupplement{TEXT} %% use this section when having video supplements available
+
+
+\appendix
+\section{}    %% Appendix A
+
+\subsection{}     %% Appendix A1, A2, etc.
+
+
+\noappendix       %% use this to mark the end of the appendix section. Otherwise the figures might be numbered incorrectly (e.g. 10 instead of 1).
+
+%% Regarding figures and tables in appendices, the following two options are possible depending on your general handling of figures and tables in the manuscript environment:
+
+%% Option 1: If you sorted all figures and tables into the sections of the text, please also sort the appendix figures and appendix tables into the respective appendix sections.
+%% They will be correctly named automatically.
+
+%% Option 2: If you put all figures after the reference list, please insert appendix tables and figures after the normal tables and figures.
+%% To rename them correctly to A1, A2, etc., please add the following commands in front of them:
+
+\appendixfigures  %% needs to be added in front of appendix figures
+
+\appendixtables   %% needs to be added in front of appendix tables
+
+
+\authorcontribution{TEXT} %% this section is mandatory
+
+\competinginterests{TEXT} %% this section is mandatory even if you declare that no competing interests are present
+
+\disclaimer{TEXT} %% optional section
+
+\begin{acknowledgements}
+TEXT
+\end{acknowledgements}
+
+
+
+
+%% REFERENCES
+
+
+
+\bibliographystyle{copernicus}
+\bibliography{references}
+%% Since the Copernicus LaTeX package includes the BibTeX style file copernicus.bst,
+%% authors experienced with BibTeX only have to include the following two lines:
+%%
+%% \bibliographystyle{copernicus}
+%% \bibliography{example.bib}
+%%
+%% URLs and DOIs can be entered in your BibTeX file as:
+%%
+%% URL = {http://www.xyz.org/~jones/idx_g.htm}
+%% DOI = {10.5194/xyz}
+
+
+%% LITERATURE CITATIONS
+%%
+%% command                        & example result
+%% \citet{jones90}|               & Jones et al. (1990)
+%% \citep{jones90}|               & (Jones et al., 1990)
+%% \citep{jones90,jones93}|       & (Jones et al., 1990, 1993)
+%% \citep[p.~32]{jones90}|        & (Jones et al., 1990, p.~32)
+%% \citep[e.g.,][]{jones90}|      & (e.g., Jones et al., 1990)
+%% \citep[e.g.,][p.~32]{jones90}| & (e.g., Jones et al., 1990, p.~32)
+%% \citeauthor{jones90}|          & Jones et al.
+%% \citeyear{jones90}|            & 1990
+
+
+
+%% FIGURES
+
+%% When figures and tables are placed at the end of the MS (article in one-column style), please add \clearpage
+%% between bibliography and first table and/or figure as well as between each table and/or figure.
+
+% The figure files should be labelled correctly with Arabic numerals (e.g. fig01.jpg, fig02.png).
+
+
+%% ONE-COLUMN FIGURES
+
+%%f
+%\begin{figure}[t]
+%\includegraphics[width=8.3cm]{FILE NAME}
+%\caption{TEXT}
+%\end{figure}
+%
+%%% TWO-COLUMN FIGURES
+%
+%%f
+%\begin{figure*}[t]
+%\includegraphics[width=12cm]{FILE NAME}
+%\caption{TEXT}
+%\end{figure*}
+%
+%
+%%% TABLES
+%%%
+%%% The different columns must be seperated with a & command and should
+%%% end with \\ to identify the column brake.
+%
+%%% ONE-COLUMN TABLE
+%
+%%t
+%\begin{table}[t]
+%\caption{TEXT}
+%\begin{tabular}{column = lcr}
+%\tophline
+%
+%\middlehline
+%
+%\bottomhline
+%\end{tabular}
+%\belowtable{} % Table Footnotes
+%\end{table}
+%
+%%% TWO-COLUMN TABLE
+%
+%%t
+%\begin{table*}[t]
+%\caption{TEXT}
+%\begin{tabular}{column = lcr}
+%\tophline
+%
+%\middlehline
+%
+%\bottomhline
+%\end{tabular}
+%\belowtable{} % Table Footnotes
+%\end{table*}
+%
+%%% LANDSCAPE TABLE
+%
+%%t
+%\begin{sidewaystable*}[t]
+%\caption{TEXT}
+%\begin{tabular}{column = lcr}
+%\tophline
+%
+%\middlehline
+%
+%\bottomhline
+%\end{tabular}
+%\belowtable{} % Table Footnotes
+%\end{sidewaystable*}
+%
+%
+%%% MATHEMATICAL EXPRESSIONS
+%
+%%% All papers typeset by Copernicus Publications follow the math typesetting regulations
+%%% given by the IUPAC Green Book (IUPAC: Quantities, Units and Symbols in Physical Chemistry,
+%%% 2nd Edn., Blackwell Science, available at: http://old.iupac.org/publications/books/gbook/green_book_2ed.pdf, 1993).
+%%%
+%%% Physical quantities/variables are typeset in italic font (t for time, T for Temperature)
+%%% Indices which are not defined are typeset in italic font (x, y, z, a, b, c)
+%%% Items/objects which are defined are typeset in roman font (Car A, Car B)
+%%% Descriptions/specifications which are defined by itself are typeset in roman font (abs, rel, ref, tot, net, ice)
+%%% Abbreviations from 2 letters are typeset in roman font (RH, LAI)
+%%% Vectors are identified in bold italic font using \vec{x}
+%%% Matrices are identified in bold roman font
+%%% Multiplication signs are typeset using the LaTeX commands \times (for vector products, grids, and exponential notations) or \cdot
+%%% The character * should not be applied as mutliplication sign
+%
+%
+%%% EQUATIONS
+%
+%%% Single-row equation
+%
+%\begin{equation}
+%
+%\end{equation}
+%
+%%% Multiline equation
+%
+%\begin{align}
+%& 3 + 5 = 8\\
+%& 3 + 5 = 8\\
+%& 3 + 5 = 8
+%\end{align}
+%
+%
+%%% MATRICES
+%
+%\begin{matrix}
+%x & y & z\\
+%x & y & z\\
+%x & y & z\\
+%\end{matrix}
+%
+%
+%%% ALGORITHM
+%
+%\begin{algorithm}
+%\caption{...}
+%\label{a1}
+%\begin{algorithmic}
+%...
+%\end{algorithmic}
+%\end{algorithm}
+%
+%
+%%% CHEMICAL FORMULAS AND REACTIONS
+%
+%%% For formulas embedded in the text, please use \chem{}
+%
+%%% The reaction environment creates labels including the letter R, i.e. (R1), (R2), etc.
+%
+%\begin{reaction}
+%%% \rightarrow should be used for normal (one-way) chemical reactions
+%%% \rightleftharpoons should be used for equilibria
+%%% \leftrightarrow should be used for resonance structures
+%\end{reaction}
+%
+%
+%%% PHYSICAL UNITS
+%%%
+%%% Please use \unit{} and apply the exponential notation
+
+
+\end{document}
