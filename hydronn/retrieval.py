@@ -133,9 +133,18 @@ class InputFile:
             hi_res.append(x)
         hi_res = np.stack(hi_res, axis=1)
 
+        invalid = np.any(np.all(np.isnan(low_res), axis=1), axis=(-2, -1))
+        invalid *= np.any(np.all(np.isnan(med_res), axis=1), axis=(-2, -1))
+        invalid *= np.any(np.all(np.isnan(hi_res), axis=1), axis=(-2, -1))
+        valid = ~invalid
+        low_res = low_res[valid]
+        med_res = med_res[valid]
+        hi_res = hi_res[valid]
+
         low_res = self.normalizer[0](low_res)
         med_res = self.normalizer[1](med_res)
         hi_res = self.normalizer[2](hi_res)
+
 
         return (
             torch.tensor(low_res),
