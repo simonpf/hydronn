@@ -10,6 +10,7 @@ from calendar import monthrange
 from concurrent.futures import ProcessPoolExecutor
 from datetime import (datetime, timedelta)
 import logging
+from multiprocessing import Queue, Manager
 import os
 from pathlib import Path
 import re
@@ -75,6 +76,24 @@ def add_parser(subparsers):
 
     parser.set_defaults(func=run)
 
+
+def load_file(queue, input_file, normalizer, output_file):
+    """
+    Helper function for parallel loading of input data.
+
+    Args:
+        queue: Queue to put input data on.
+        input_file: Name of the retrieval input file.
+        normalizer: Normalizer object to use to normalize the input data.
+        output_file: File to write the output to.
+    """
+    from hydronn.retrieval import InputFile
+    queue.put((
+        InputFile(input_file, normalizer, batch_size=6),
+        output_file
+    ))
+
+
 def run(args):
     """
     This function implements the actual execution of retrieval for
@@ -84,7 +103,7 @@ def run(args):
         args: The namespace object provided by the top-level parser.
     """
     from quantnn.qrnn import QRNN
-    from hydronn.retrieval import Retrieval
+    from hydronn.retrieval import Retrieval, InputFile
     from hydronn.utils import save_and_compress
 
     model = Path(args.model)
@@ -142,27 +161,43 @@ def run(args):
         )
         return 1
 
-    pool = ProcessPoolExecutor(max_workers=1)
-    for f, o in zip(input_files, output_files):
-        o_c = Path(str(o) + ".gz")
-        if not (o.exists() or o_c.exists()):
-            print(f"File '{f}' doesn't exist. continuing.")
-            retrieval = Retrieval([f],
-                                  model,
-                                  normalizer,
-                                  tile_size=tile_size,
-                                  overlap=overlap,
-                                  device=device,
-                                  correction=correction)
-            results = retrieval.run()
-            if not o.parent.exists():
-                o.parent.mkdir(parents=True)
-            if str(o).endswith(".gz"):
-                o = str(o)[:-3]
-            pool.submit(save_and_compress, results, o)
-            print(f"Finished processing input file '{f}'")
-        else:
-            print(f"File '{f}' already exists. Skipping.")
+    load_pool = ProcessPoolExecutor(max_workers=4)
+    compress_pool = ProcessPoolExecutor(max_workers=2)
+    input_queue = Manager().Queue(maxsize=4)
 
-    pool.shutdown(wait=True)
+    # Check which files need to be process and submit loading
+    # tasks.
+    n_files = 0
+    for input_file, output_file in zip(input_files, output_files):
+        output_compressed = Path(str(output_file) + ".gz")
+        if not (output_file.exists() or output_compressed.exists()):
+            #print(f"File '{output_file}' doesn't exist. continuing.")
+            load_pool.submit(load_file, input_queue, input_file, normalizer, output_file)
+            print("submitting")
+            n_files += 1
+        else:
+            print(f"File '{output_file}' already exists. Skipping.")
+
+    # Go through input an process on device.
+    for i in range(n_files):
+        input_file, output_file = input_queue.get()
+        retrieval = Retrieval([input_file],
+                              model,
+                              normalizer,
+                              tile_size=tile_size,
+                              overlap=overlap,
+                              device=device,
+                              correction=correction)
+        results = retrieval.run()
+
+        if not output_file.parent.exists():
+            output_file.parent.mkdir(parents=True)
+        if str(output_file).endswith(".gz"):
+            output_file = str(output_file)[:-3]
+        compress_pool.submit(save_and_compress, results, output_file)
+        print(f"Finished processing file '{output_file}'")
+
+    compress_pool.shutdown(wait=True)
+    load_pool.shutdown(wait=True)
+
 

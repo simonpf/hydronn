@@ -335,7 +335,7 @@ class Retrieval:
                 the input domain.
             device: The device on which to run the retrieval.
         """
-        self.input_files = sorted(input_files)
+        self.input_files = input_files
         self.model = model
         self.normalizer = normalizer
         self.tile_size = tile_size
@@ -359,7 +359,10 @@ class Retrieval:
         Return:
             An 'xarray.Dataset' containing the retrieval results.
         """
-        input_data = InputFile(input_file, self.normalizer, batch_size=6)
+        if not isinstance(input_file, InputFile):
+            input_data = InputFile(input_file, self.normalizer, batch_size=6)
+        else:
+            input_data = input_file
         quantiles = [
             0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6,
             0.7, 0.8, 0.9, 0.95, 0.99, 0.999
