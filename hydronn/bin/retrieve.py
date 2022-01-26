@@ -105,6 +105,34 @@ def loader(task_queue, input_queue):
         ))
         print(f"Loaded {input_file}.")
 
+def process_file(
+        model,
+        input_file,
+        output_file,
+        tile_size,
+        overlap,
+        device,
+        correction):
+        from hydronn.retrieval import Retrieval, InputFile
+        from hydronn.utils import save_and_compress
+        from quantnn.qrnn import QRNN
+        print(f"Running retrieval {input_file}.")
+        model = QRNN.load(model)
+        normalizer = model.normalizer
+        retrieval = Retrieval([input_file],
+                              model,
+                              normalizer,
+                              tile_size=tile_size,
+                              overlap=overlap,
+                              device=device,
+                              correction=correction)
+        results = retrieval.run()
+        if not output_file.parent.exists():
+            output_file.parent.mkdir(parents=True)
+        if str(output_file).endswith(".gz"):
+            output_file = str(output_file)[:-3]
+        save_and_compress(results, output_file)
+
 
 def run(args):
     """
@@ -121,8 +149,6 @@ def run(args):
     model = Path(args.model)
     if not model.exists():
         LOGGER.error("The model %s' does not exist.", model)
-    model = QRNN.load(model)
-    normalizer = model.normalizer
 
     input_path = Path(args.input_path)
     if not input_path.exists():
@@ -173,45 +199,43 @@ def run(args):
         )
         return 1
 
-    compress_pool = ProcessPoolExecutor(max_workers=2)
-    task_queue = Queue()
-    input_queue = Queue(maxsize=4)
+    pool = ProcessPoolExecutor(max_workers=4)
 
-    # Check which files need to be process and submit loading
-    # tasks.
-    n_files = 0
+    tasks = []
     for input_file, output_file in zip(input_files, output_files):
         output_compressed = Path(str(output_file) + ".gz")
         if not (output_file.exists() or output_compressed.exists()):
-            task_queue.put((input_file, normalizer, output_file))
-            n_files += 1
+            tasks.append(pool.submit(
+                process_file,
+                model,
+                input_file, output_file, tile_size, overlap, device,
+                correction
+            ))
         else:
             print(f"File '{output_file}' already exists. Skipping.")
 
-    processes = [Process(target=loader, args=(task_queue, input_queue)) for i in range(6)]
-    [p.start() for p in processes]
+    for task in tasks:
+        task.result()
 
-    # Go through input an process on device.
-    for i in range(n_files):
-        input_file, output_file = input_queue.get()
-        print(f"Running retrieval {i}.")
-        retrieval = Retrieval([input_file],
-                              model,
-                              normalizer,
-                              tile_size=tile_size,
-                              overlap=overlap,
-                              device=device,
-                              correction=correction)
-        results = retrieval.run()
+    ## Go through input an process on device.
+    #for i in range(n_files):
+    #    print(f"Running retrieval {i}.")
+    #    retrieval = Retrieval([input_file],
+    #                          model,
+    #                          normalizer,
+    #                          tile_size=tile_size,
+    #                          overlap=overlap,
+    #                          device=device,
+    #                          correction=correction)
+    #    results = retrieval.run()
 
-        if not output_file.parent.exists():
-            output_file.parent.mkdir(parents=True)
-        if str(output_file).endswith(".gz"):
-            output_file = str(output_file)[:-3]
-        compress_pool.submit(save_and_compress, results, output_file)
-        print(f"Finished processing file '{output_file}'")
+    #    if not output_file.parent.exists():
+    #        output_file.parent.mkdir(parents=True)
+    #    if str(output_file).endswith(".gz"):
+    #        output_file = str(output_file)[:-3]
+    #    compress_pool.submit(save_and_compress, results, output_file)
+    #    print(f"Finished processing file '{output_file}'")
 
-    [p.joint for p in processes]
-    compress_pool.shutdown(wait=True)
+    #compress_pool.shutdown(wait=True)
 
 
