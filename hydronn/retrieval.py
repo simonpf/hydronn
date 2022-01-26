@@ -466,6 +466,10 @@ class Retrieval:
                                 bins,
                             )
 
+                    for t in x_t:
+                        del t
+                    del y_pred
+
                     sample_dep[-1].append(
                         qd.sample_posterior(y_pred_dep, bins).cpu().numpy()[:, 0]
                     )
@@ -525,6 +529,11 @@ class Retrieval:
                         mean_indep_c[-1].append(
                             qd.posterior_mean(y_pred_indep_c, bins).cpu().numpy()
                         )
+                        del y_pred_dep_c
+                        del y_pred_indep_c
+
+                    del y_pred_dep
+                    del y_pred_indep
 
         # Finally, concatenate over rows and columns.
         sample_dep = np.concatenate([np.concatenate(r, -1) for r in sample_dep], -2)
@@ -538,6 +547,7 @@ class Retrieval:
             [np.concatenate(r, -2) for r in quantiles_indep], -3
         )
         mean_indep = np.concatenate([np.concatenate(r, -1) for r in mean_indep], -2)
+
 
         dims = ("time", "x", "y")
         dims_r = ("time", "x", "y")

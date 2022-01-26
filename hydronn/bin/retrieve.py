@@ -10,13 +10,14 @@ from calendar import monthrange
 from concurrent.futures import ProcessPoolExecutor
 from datetime import (datetime, timedelta)
 import logging
-from multiprocessing import Queue, Manager, Process
+from multiprocessing import Queue, Manager, Process, Lock
 import os
 from pathlib import Path
 import re
 import shutil
 import subprocess
 from tempfile import TemporaryDirectory, mkdtemp
+import gc
 
 from rich.progress import track
 import xarray as xr
@@ -105,6 +106,12 @@ def loader(task_queue, input_queue):
         ))
         print(f"Loaded {input_file}.")
 
+
+_LOCK = None
+def pool_init(lock):
+    global _LOCK
+    _LOCK = lock
+
 def process_file(
         model,
         input_file,
@@ -116,7 +123,7 @@ def process_file(
         from hydronn.retrieval import Retrieval, InputFile
         from hydronn.utils import save_and_compress
         from quantnn.qrnn import QRNN
-        print(f"Running retrieval {input_file}.")
+        import torch
         model = QRNN.load(model)
         normalizer = model.normalizer
         retrieval = Retrieval([input_file],
@@ -126,7 +133,12 @@ def process_file(
                               overlap=overlap,
                               device=device,
                               correction=correction)
+        _LOCK.acquire()
         results = retrieval.run()
+        del retrieval
+        model.model.cpu()
+        gc.collect()
+        _LOCK.release()
         if not output_file.parent.exists():
             output_file.parent.mkdir(parents=True)
         if str(output_file).endswith(".gz"):
@@ -199,7 +211,10 @@ def run(args):
         )
         return 1
 
-    pool = ProcessPoolExecutor(max_workers=4)
+    lock = Lock()
+    pool = ProcessPoolExecutor(
+        max_workers=4, initializer=pool_init, initargs=(lock,)
+    )
 
     tasks = []
     for input_file, output_file in zip(input_files, output_files):
