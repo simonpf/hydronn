@@ -3,7 +3,8 @@
 hydronn.retrieval
 =================
 
-This module handles the processing of the retrieval.
+This module contains the implementation of the hydronn retrieval that
+produces hourly accumulations from GOES input observations.
 """
 import numpy as np
 import xarray as xr
@@ -11,28 +12,39 @@ import torch
 
 import quantnn.density as qd
 
-from hydronn.data.goes import (LOW_RES_CHANNELS,
-                               MED_RES_CHANNELS,
-                               HI_RES_CHANNELS,
-                               ROW_START,
-                               ROW_END,
-                               COL_START,
-                               COL_END)
+from hydronn.data.goes import (
+    LOW_RES_CHANNELS,
+    MED_RES_CHANNELS,
+    HI_RES_CHANNELS,
+    ROW_START,
+    ROW_END,
+    COL_START,
+    COL_END,
+)
 from hydronn.utils import decompress_and_load
 from hydronn.data.training_data import HydronnDataset
+
+######################################################################
+# Correction
+######################################################################
 
 
 class AprioriCorrection:
     """
     The 'AprioriCorrection' class implements a priori correction based
-    on Bayes theorem using a precomputed likelihood ratio.
+    on  a precomputed likelihood ratio.
     """
+
     def __init__(self, ratio_file):
+        """
+        Load a priori correction.
+
+        Args:
+            ratio_file: File path pointing to a correction file.
+        """
         ratio_data = xr.load_dataset(ratio_file)
         self.n_bins = ratio_data.bins.size
-        self.ratios_dep = torch.Tensor(
-            ratio_data.ratios_dep.data.astype(np.float32)
-        )
+        self.ratios_dep = torch.Tensor(ratio_data.ratios_dep.data.astype(np.float32))
         self.ratios_indep = torch.Tensor(
             ratio_data.ratios_indep.data.astype(np.float32)
         )
@@ -58,16 +70,19 @@ class AprioriCorrection:
         return (p_dep * ratios_dep, p_indep * ratios_indep)
 
 
+######################################################################
+# Retrieval input
+######################################################################
+
+
 class InputFile:
     """
     Interface class to load the GOES observations from the NetCDF files
     containing the retrieval input and to prepare the input for the
     neural network model.
     """
-    def __init__(self,
-                 filename,
-                 normalizer,
-                 batch_size=-1):
+
+    def __init__(self, filename, normalizer, batch_size=-1):
         """
         Args:
             filename: Path to the NetCDF file containing the data.
@@ -81,30 +96,22 @@ class InputFile:
         self.data = self.data.transpose(*dims)
         self.normalizer = normalizer
         self.batch_size = batch_size
+        self._load_data()
 
-
-    def get_input_data(self, t_start, t_end):
+    def _load_data(self):
         """
-        Get input samples for a range of time indices.
-
-        Args:
-            t_start: The starting index of the range of time indices.
-            t_end: The next index from the last value in the range of
-                time indices.
-
-        Return:
-            A 'torch.Tensor' containing the input data for the specified
-            range of t indices.
+        Load input data from file. Data is loaded into the 'x' attribute of
+        the object.
         """
         m = ROW_END - ROW_START
         n = COL_END - COL_START
-        t = t_end - t_start
+        t = self.data.time.size
 
         low_res = []
         for c in LOW_RES_CHANNELS:
             channel_name = f"C{c:02}"
             if channel_name in self.data:
-                x = self.data[channel_name].data[t_start:t_end]
+                x = self.data[channel_name].data
             else:
                 x = np.zeros((t, m, n), dtype=np.float32)
                 x[:] = np.nan
@@ -115,7 +122,7 @@ class InputFile:
         for c in MED_RES_CHANNELS:
             channel_name = f"C{c:02}"
             if channel_name in self.data:
-                x = self.data[channel_name].data[t_start:t_end]
+                x = self.data[channel_name].data
             else:
                 x = np.zeros((t, 2 * m, 2 * n), dtype=np.float32)
                 x[:] = np.nan
@@ -126,7 +133,7 @@ class InputFile:
         for c in HI_RES_CHANNELS:
             channel_name = f"C{c:02}"
             if channel_name in self.data:
-                x = self.data[channel_name].data[t_start:t_end]
+                x = self.data[channel_name].data
             else:
                 x = np.zeros((t, 4 * m, 4 * n), dtype=np.float32)
                 x[:] = np.nan
@@ -145,12 +152,7 @@ class InputFile:
         med_res = self.normalizer[1](med_res)
         hi_res = self.normalizer[2](hi_res)
 
-
-        return (
-            torch.tensor(low_res),
-            torch.tensor(med_res),
-            torch.tensor(hi_res)
-        )
+        self.x = (torch.tensor(low_res), torch.tensor(med_res), torch.tensor(hi_res))
 
     def __len__(self):
         """The number of batches in the file."""
@@ -163,11 +165,12 @@ class InputFile:
     def __getitem__(self, i):
         """Return a given batch."""
         if (self.batch_size < 0) or (self.batch_size > self.data.time.size):
-            return self.get_input_data(0, self.data.time.size)
+            return self.x
         else:
             t_start = i * self.batch_size
             t_end = t_start + self.batch_size
-            return self.get_input_data(t_start, t_end)
+            return [t[t_start:t_end] for t in self.x]
+
 
 ###############################################################################
 # Tiling functionality
@@ -213,6 +216,7 @@ class Tiler:
         M: The number of tiles along the first image dimension (rows).
         N: The number of tiles along the second image dimension (columns).
     """
+
     def __init__(self, x, tile_size=512, overlap=32):
         """
         Args:
@@ -270,7 +274,7 @@ class Tiler:
             j_start *= 2
             j_end *= 2
 
-        return  x_tile
+        return x_tile
 
     def get_slices(self, i, j):
         """
@@ -307,23 +311,30 @@ class Tiler:
 
         return (slice_i, slice_j)
 
-
     def __repr__(self):
         return f"Tiler(tile_size={self.tile_size}, overlap={self.overlap})"
+
+
+###############################################################################
+# The retrieval
+###############################################################################
 
 
 class Retrieval:
     """
     Processor class to run the retrieval for a list of input files.
     """
-    def __init__(self,
-                 input_files,
-                 model,
-                 normalizer,
-                 tile_size=256,
-                 overlap=32,
-                 device="cuda",
-                 correction=None):
+
+    def __init__(
+        self,
+        input_files,
+        model,
+        normalizer,
+        tile_size=256,
+        overlap=32,
+        device="cuda",
+        correction=None,
+    ):
         """
         Args:
             input_files: The list of input files for which to run the
@@ -364,8 +375,20 @@ class Retrieval:
         else:
             input_data = input_file
         quantiles = [
-            0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6,
-            0.7, 0.8, 0.9, 0.95, 0.99, 0.999
+            0.01,
+            0.05,
+            0.1,
+            0.2,
+            0.3,
+            0.4,
+            0.5,
+            0.6,
+            0.7,
+            0.8,
+            0.9,
+            0.95,
+            0.99,
+            0.999,
         ]
         device = self.device
 
@@ -412,7 +435,6 @@ class Retrieval:
 
             for j in range(tiler.N):
 
-
                 with torch.no_grad():
                     # Retrieve tile
                     x_t = tiler.get_tile(i, j)
@@ -429,10 +451,7 @@ class Retrieval:
                         x_t_b = [t[[k]] for t in x_t]
                         x_t_b = [t.to(device) for t in x_t_b]
                         y_pred = model(x_t_b)[(...,) + slices]
-                        y_pred = self.model._post_process_prediction(
-                            y_pred,
-                            bins
-                        )
+                        y_pred = self.model._post_process_prediction(y_pred, bins)
 
                         if y_pred_dep is None:
                             y_pred_dep = (1 / n_inputs) * y_pred
@@ -444,105 +463,112 @@ class Retrieval:
                                 bins * (k / (k + 1)),
                                 y_pred * (k + 1),
                                 bins / (k + 1),
-                                bins
+                                bins,
                             )
 
-                    sample_dep[-1].append(qd.sample_posterior(
-                        y_pred_dep, bins
-                    ).cpu().numpy()[:, 0])
-                    quantiles_dep[-1].append(qd.posterior_quantiles(
-                        y_pred_dep, bins, quantiles
-                    ).cpu().numpy().transpose([0, 2, 3, 1]))
-                    mean_dep[-1].append(qd.posterior_mean(
-                        y_pred_dep, bins
-                    ).cpu().numpy())
+                    sample_dep[-1].append(
+                        qd.sample_posterior(y_pred_dep, bins).cpu().numpy()[:, 0]
+                    )
+                    quantiles_dep[-1].append(
+                        qd.posterior_quantiles(y_pred_dep, bins, quantiles)
+                        .cpu()
+                        .numpy()
+                        .transpose([0, 2, 3, 1])
+                    )
+                    mean_dep[-1].append(
+                        qd.posterior_mean(y_pred_dep, bins).cpu().numpy()
+                    )
 
-                    sample_indep[-1].append(qd.sample_posterior(
-                        y_pred_indep, bins
-                    ).cpu().numpy()[:, 0])
-                    quantiles_indep[-1].append(qd.posterior_quantiles(
-                        y_pred_indep, bins, quantiles
-                    ).cpu().numpy().transpose([0, 2, 3, 1]))
-                    mean_indep[-1].append(qd.posterior_mean(
-                        y_pred_indep, bins
-                    ).cpu().numpy())
+                    sample_indep[-1].append(
+                        qd.sample_posterior(y_pred_indep, bins).cpu().numpy()[:, 0]
+                    )
+                    quantiles_indep[-1].append(
+                        qd.posterior_quantiles(y_pred_indep, bins, quantiles)
+                        .cpu()
+                        .numpy()
+                        .transpose([0, 2, 3, 1])
+                    )
+                    mean_indep[-1].append(
+                        qd.posterior_mean(y_pred_indep, bins).cpu().numpy()
+                    )
 
                     if self.correction:
                         y_pred_dep_c, y_pred_indep_c = self.correction(
-                            y_pred_dep,
-                            y_pred_indep
+                            y_pred_dep, y_pred_indep
                         )
                         y_pred_dep_c = qd.normalize(y_pred_dep_c, bins, 1, True)
-                        sample_dep_c[-1].append(qd.sample_posterior(
-                            y_pred_dep_c, bins
-                        ).cpu().numpy()[:, 0])
-                        quantiles_dep_c[-1].append(qd.posterior_quantiles(
-                            y_pred_dep_c, bins, quantiles
-                        ).cpu().numpy().transpose([0, 2, 3, 1]))
-                        mean_dep_c[-1].append(qd.posterior_mean(
-                            y_pred_dep_c, bins
-                        ).cpu().numpy())
+                        sample_dep_c[-1].append(
+                            qd.sample_posterior(y_pred_dep_c, bins).cpu().numpy()[:, 0]
+                        )
+                        quantiles_dep_c[-1].append(
+                            qd.posterior_quantiles(y_pred_dep_c, bins, quantiles)
+                            .cpu()
+                            .numpy()
+                            .transpose([0, 2, 3, 1])
+                        )
+                        mean_dep_c[-1].append(
+                            qd.posterior_mean(y_pred_dep_c, bins).cpu().numpy()
+                        )
 
                         y_pred_indep_c = qd.normalize(y_pred_indep_c, bins, 1, True)
-                        sample_indep_c[-1].append(qd.sample_posterior(
-                            y_pred_indep_c, bins
-                        ).cpu().numpy()[:, 0])
-                        quantiles_indep_c[-1].append(qd.posterior_quantiles(
-                            y_pred_indep_c, bins, quantiles
-                        ).cpu().numpy().transpose([0, 2, 3, 1]))
-                        mean_indep_c[-1].append(qd.posterior_mean(
-                            y_pred_indep_c, bins
-                        ).cpu().numpy())
+                        sample_indep_c[-1].append(
+                            qd.sample_posterior(y_pred_indep_c, bins)
+                            .cpu()
+                            .numpy()[:, 0]
+                        )
+                        quantiles_indep_c[-1].append(
+                            qd.posterior_quantiles(y_pred_indep_c, bins, quantiles)
+                            .cpu()
+                            .numpy()
+                            .transpose([0, 2, 3, 1])
+                        )
+                        mean_indep_c[-1].append(
+                            qd.posterior_mean(y_pred_indep_c, bins).cpu().numpy()
+                        )
 
         # Finally, concatenate over rows and columns.
-        sample_dep = np.concatenate(
-            [np.concatenate(r, -1) for r in sample_dep], -2)
+        sample_dep = np.concatenate([np.concatenate(r, -1) for r in sample_dep], -2)
         quantiles_dep = np.concatenate(
             [np.concatenate(r, -2) for r in quantiles_dep], -3
         )
-        mean_dep = np.concatenate(
-            [np.concatenate(r, -1) for r in mean_dep], -2
-        )
+        mean_dep = np.concatenate([np.concatenate(r, -1) for r in mean_dep], -2)
 
-        sample_indep = np.concatenate(
-            [np.concatenate(r, -1) for r in sample_indep], -2
-        )
+        sample_indep = np.concatenate([np.concatenate(r, -1) for r in sample_indep], -2)
         quantiles_indep = np.concatenate(
             [np.concatenate(r, -2) for r in quantiles_indep], -3
         )
-        mean_indep = np.concatenate(
-            [np.concatenate(r, -1) for r in mean_indep], -2
-        )
+        mean_indep = np.concatenate([np.concatenate(r, -1) for r in mean_indep], -2)
 
         dims = ("time", "x", "y")
         dims_r = ("time", "x", "y")
         if mean_dep.shape[-2] != input_data.data.x.size:
             dims_r = ("time", "x_4", "y_4")
 
-        results = xr.Dataset({
-            "time":  ("time", input_data.data.time.mean("time").data.reshape((1,))),
-            "n_inputs": (("time",), [n_inputs]),
-            "latitude": input_data.data.latitude.mean("time"),
-            "longitude": input_data.data.longitude.mean("time"),
-            "quantiles": (("quantiles",), quantiles),
-            "mean_dep": (dims_r, mean_dep),
-            "sample_dep": (dims_r, sample_dep),
-            "quantiles_dep": (dims_r + ("quantiles",), quantiles_dep),
-            "mean_indep": (dims_r, mean_indep),
-            "sample_indep": (dims_r, sample_indep),
-            "quantiles_indep": (dims_r + ("quantiles",), quantiles_indep)
-        })
+        results = xr.Dataset(
+            {
+                "time": ("time", input_data.data.time.mean("time").data.reshape((1,))),
+                "n_inputs": (("time",), [n_inputs]),
+                "latitude": input_data.data.latitude.mean("time"),
+                "longitude": input_data.data.longitude.mean("time"),
+                "quantiles": (("quantiles",), quantiles),
+                "mean_dep": (dims_r, mean_dep),
+                "sample_dep": (dims_r, sample_dep),
+                "quantiles_dep": (dims_r + ("quantiles",), quantiles_dep),
+                "mean_indep": (dims_r, mean_indep),
+                "sample_indep": (dims_r, sample_indep),
+                "quantiles_indep": (dims_r + ("quantiles",), quantiles_indep),
+            }
+        )
 
         if self.correction:
             # Finally, concatenate over rows and columns.
             sample_dep_c = np.concatenate(
-                [np.concatenate(r, -1) for r in sample_dep_c], -2)
+                [np.concatenate(r, -1) for r in sample_dep_c], -2
+            )
             quantiles_dep_c = np.concatenate(
                 [np.concatenate(r, -2) for r in quantiles_dep_c], -3
             )
-            mean_dep_c = np.concatenate(
-                [np.concatenate(r, -1) for r in mean_dep_c], -2
-            )
+            mean_dep_c = np.concatenate([np.concatenate(r, -1) for r in mean_dep_c], -2)
 
             sample_indep_c = np.concatenate(
                 [np.concatenate(r, -1) for r in sample_indep_c], -2
@@ -573,16 +599,17 @@ class Retrieval:
         return xr.concat(results, "time")
 
 
+######################################################################
+# Model evaluator
+######################################################################
+
+
 class Evaluator:
     """
     Processor class to evaluate the Hydronn model on test data.
     """
-    def __init__(self,
-                 input_files,
-                 model,
-                 normalizer,
-                 device="cuda",
-                 resolution=2):
+
+    def __init__(self, input_files, model, normalizer, device="cuda", resolution=2):
         """
         Args:
             input_files: The list of input files for which to run the
@@ -612,11 +639,23 @@ class Evaluator:
             input_file,
             normalizer=self.normalizer,
             batch_size=32,
-            resolution=self.resolution
+            resolution=self.resolution,
         )
         tau = [
-            0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6,
-            0.7, 0.8, 0.9, 0.95, 0.99, 0.999
+            0.01,
+            0.05,
+            0.1,
+            0.2,
+            0.3,
+            0.4,
+            0.5,
+            0.6,
+            0.7,
+            0.8,
+            0.9,
+            0.95,
+            0.99,
+            0.999,
         ]
         device = self.device
 
@@ -633,19 +672,14 @@ class Evaluator:
                 x, y = input_data[i]
                 x = [t.to(device) for t in x]
                 y_pdf = model(x)
-                y_pdf = self.model._post_process_prediction(
-                    y_pdf,
-                    bins
-                )
+                y_pdf = self.model._post_process_prediction(y_pdf, bins)
 
                 # Posterior mean
                 y_mean = qd.posterior_mean(y_pdf, bins=bins)
                 means.append(y_mean.cpu().numpy())
 
                 # Quantiles
-                y_quants = qd.posterior_quantiles(y_pdf,
-                                                  quantiles=tau,
-                                                  bins=bins)
+                y_quants = qd.posterior_quantiles(y_pdf, quantiles=tau, bins=bins)
                 quantiles.append(y_quants.cpu().numpy().transpose([0, 2, 3, 1]))
 
                 # Samples
@@ -659,18 +693,15 @@ class Evaluator:
         samples = np.concatenate(samples)
         truth = np.concatenate(truth)
 
-        print(means.shape)
-        print(quantiles.shape)
-        print(samples.shape)
-        print(truth.shape)
-
         dims = ("samples", "x", "y")
-        results = xr.Dataset({
-            "surface_precip": (dims, means),
-            "surface_precip_quantiles": (dims + ("quantiles",), quantiles),
-            "surface_precip_samples": (dims, samples),
-            "surface_precip_true": (dims, truth)
-        })
+        results = xr.Dataset(
+            {
+                "surface_precip": (dims, means),
+                "surface_precip_quantiles": (dims + ("quantiles",), quantiles),
+                "surface_precip_samples": (dims, samples),
+                "surface_precip_true": (dims, truth),
+            }
+        )
         return results
 
     def run(self):
