@@ -107,10 +107,10 @@ def loader(task_queue, input_queue):
         print(f"Loaded {input_file}.")
 
 
-_LOCK = None
-def pool_init(lock):
-    global _LOCK
-    _LOCK = lock
+_QUEUE = None
+def pool_init(queue):
+    global _QUEUE
+    _QUEUE = queue
 
 def process_file(
         model,
@@ -126,19 +126,21 @@ def process_file(
         import torch
         model = QRNN.load(model)
         normalizer = model.normalizer
-        retrieval = Retrieval([input_file],
+        retrieval = Retrieval([InputFile(input_file, normalizer)],
                               model,
                               normalizer,
                               tile_size=tile_size,
                               overlap=overlap,
                               device=device,
                               correction=correction)
-        _LOCK.acquire()
+        while _QUEUE.qsize() > 1:
+            pass
+        _QUEUE.put(1)
         results = retrieval.run()
         del retrieval
         model.model.cpu()
         gc.collect()
-        _LOCK.release()
+        _QUEUE.get()
         if not output_file.parent.exists():
             output_file.parent.mkdir(parents=True)
         if str(output_file).endswith(".gz"):
@@ -211,9 +213,9 @@ def run(args):
         )
         return 1
 
-    lock = Lock()
+    queue = Queue()
     pool = ProcessPoolExecutor(
-        max_workers=4, initializer=pool_init, initargs=(lock,)
+        max_workers=4, initializer=pool_init, initargs=(queue,)
     )
 
     tasks = []
