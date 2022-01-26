@@ -10,7 +10,7 @@ from calendar import monthrange
 from concurrent.futures import ProcessPoolExecutor
 from datetime import (datetime, timedelta)
 import logging
-from multiprocessing import Queue, Manager
+from multiprocessing import Queue, Manager, Process
 import os
 from pathlib import Path
 import re
@@ -94,6 +94,18 @@ def load_file(queue, input_file, normalizer, output_file):
     ))
 
 
+def loader(task_queue, input_queue):
+    from hydronn.retrieval import InputFile
+    while task_queue.qsize():
+        input_file, normalizer, output_file = task_queue.get()
+        print(f"Loading {input_file}.")
+        input_queue.put((
+            InputFile(input_file, normalizer, batch_size=6),
+            output_file
+        ))
+        print(f"Loaded {input_file}.")
+
+
 def run(args):
     """
     This function implements the actual execution of retrieval for
@@ -161,9 +173,9 @@ def run(args):
         )
         return 1
 
-    load_pool = ProcessPoolExecutor(max_workers=4)
     compress_pool = ProcessPoolExecutor(max_workers=2)
-    input_queue = Manager().Queue(maxsize=4)
+    task_queue = Queue()
+    input_queue = Queue(maxsize=4)
 
     # Check which files need to be process and submit loading
     # tasks.
@@ -171,16 +183,18 @@ def run(args):
     for input_file, output_file in zip(input_files, output_files):
         output_compressed = Path(str(output_file) + ".gz")
         if not (output_file.exists() or output_compressed.exists()):
-            #print(f"File '{output_file}' doesn't exist. continuing.")
-            load_pool.submit(load_file, input_queue, input_file, normalizer, output_file)
-            print("submitting")
+            task_queue.put((input_file, normalizer, output_file))
             n_files += 1
         else:
             print(f"File '{output_file}' already exists. Skipping.")
 
+    processes = [Process(target=loader, args=(task_queue, input_queue)) for i in range(6)]
+    [p.start() for p in processes]
+
     # Go through input an process on device.
     for i in range(n_files):
         input_file, output_file = input_queue.get()
+        print(f"Running retrieval {i}.")
         retrieval = Retrieval([input_file],
                               model,
                               normalizer,
@@ -197,7 +211,7 @@ def run(args):
         compress_pool.submit(save_and_compress, results, output_file)
         print(f"Finished processing file '{output_file}'")
 
+    [p.joint for p in processes]
     compress_pool.shutdown(wait=True)
-    load_pool.shutdown(wait=True)
 
 
