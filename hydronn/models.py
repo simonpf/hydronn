@@ -268,6 +268,7 @@ class Hydronn4IR(nn.Module):
         if isinstance(n_blocks, int):
             n_blocks = [n_blocks] * 7
 
+        self.avg_in = nn.AvgPool2d(2, 2)
         self.block_in = XceptionBlock(
             1, n_features_body, downsample=False
         )
@@ -284,7 +285,7 @@ class Hydronn4IR(nn.Module):
         self.up_block_2 = UpsamplingBlock(n_features_body)
         self.up_block = UpsamplingBlock(n_features_body)
 
-        self.head = MLPHead(n_features_body + 16,
+        self.head = MLPHead(n_features_body + 1,
                             n_features_head,
                             n_outputs,
                             n_layers_head)
@@ -295,8 +296,8 @@ class Hydronn4IR(nn.Module):
         """
         low_res, med_res, hi_res = x
 
-        x_in = x_low[:, [-4]]
-        x = self.block_in(low_res)
+        x_in = self.avg_in(low_res[:, [-4]])
+        x = self.block_in(x_in)
 
         x_2 = self.down_block_2(x)
         x_4 = self.down_block_4(x_2)

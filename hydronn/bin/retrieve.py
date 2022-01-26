@@ -7,7 +7,7 @@ This module implements the command line application to run the hydronn
 retrieval.
 """
 from calendar import monthrange
-from concurrent.futures import ThreadPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from datetime import (datetime, timedelta)
 import logging
 import os
@@ -142,6 +142,7 @@ def run(args):
         )
         return 1
 
+    pool = ProcessPoolExecutor(max_workers=1)
     for f, o in zip(input_files, output_files):
         o_c = Path(str(o) + ".gz")
         if not (o.exists() or o_c.exists()):
@@ -158,8 +159,10 @@ def run(args):
                 o.parent.mkdir(parents=True)
             if str(o).endswith(".gz"):
                 o = str(o)[:-3]
-            save_and_compress(results, o)
+            pool.submit(save_and_compress, results, o)
             print(f"Finished processing input file '{f}'")
         else:
             print(f"File '{f}' already exists. Skipping.")
+
+    pool.shutdown(wait=True)
 

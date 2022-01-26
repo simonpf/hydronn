@@ -114,7 +114,7 @@ def add_parser(subparsers):
     )
     parser.add_argument(
         "--ir",
-        action="store_false",
+        action="store_true",
         help=("Whether to train an IR only retrieval.")
     )
 
@@ -179,6 +179,10 @@ def run(args):
     n_layers_head = args.n_features_head
     n_features_head = args.n_features_head
     ir = args.ir
+
+    LOGGER.info("Training %s km model.", resolution)
+    if ir:
+        LOGGER.info("Training IR configuration.")
 
     if output.is_dir():
         network_name = (
