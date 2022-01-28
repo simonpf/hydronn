@@ -136,11 +136,13 @@ def process_file(
         while _QUEUE.qsize() > 1:
             pass
         _QUEUE.put(1)
-        results = retrieval.run()
-        del retrieval
-        model.model.cpu()
-        gc.collect()
-        _QUEUE.get()
+        try:
+            results = retrieval.run()
+            del retrieval
+            model.model.cpu()
+            gc.collect()
+        finally:
+            _QUEUE.get()
         if not output_file.parent.exists():
             output_file.parent.mkdir(parents=True)
         if str(output_file).endswith(".gz"):
