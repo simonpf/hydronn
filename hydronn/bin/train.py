@@ -328,4 +328,6 @@ def run(args):
         LOGGER.info(
             f"Saving training network to {output}."
         )
+        xrnn.normalizer = normalizer
+        xrnn.resolution = resolution
         xrnn.save(output)

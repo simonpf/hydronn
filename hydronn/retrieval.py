@@ -217,7 +217,7 @@ class Tiler:
         N: The number of tiles along the second image dimension (columns).
     """
 
-    def __init__(self, x, tile_size=512, overlap=32):
+    def __init__(self, x, tile_size=512, overlap=32, resolution=2):
         """
         Args:
             x: List of input tensors for the hydronn retrieval.
@@ -247,6 +247,8 @@ class Tiler:
 
         self.M = len(i_start)
         self.N = len(j_start)
+
+        self.resolution = resolution
 
     def get_tile(self, i, j):
         """
@@ -308,6 +310,9 @@ class Tiler:
         else:
             j_clip_r = -self.j_clip[j]
         slice_j = slice(j_clip_l, j_clip_r)
+
+        if self.resolution > 2:
+            return (slice_i // 2, slice_j // 2)
 
         return (slice_i, slice_j)
 
@@ -398,7 +403,7 @@ class Retrieval:
         model = self.model.model.to(device)
 
         x = input_data[0]
-        tiler = Tiler(x, tile_size=self.tile_size, overlap=self.overlap)
+        tiler = Tiler(x, tile_size=self.tile_size, overlap=self.overlap, resolution=self.model.resolution)
 
         sample_dep = []
         quantiles_dep = []
