@@ -290,32 +290,29 @@ class Tiler:
             Tuple of slices that can be used to clip the retrieval
             results to obtain non-overlapping tiles.
         """
+        scaling = 1
+        if self.resolution > 2:
+            scaling = 2
 
         if i == 0:
             i_clip_l = 0
         else:
-            i_clip_l = self.i_clip[i - 1]
+            i_clip_l = self.i_clip[i - 1] // scaling
         if i >= self.M - 1:
             i_clip_r = None
         else:
-            i_clip_r = -self.i_clip[i]
-        if self.resolution > 2:
-            slice_i = slice(i_clip_l // 2, i_clip_r // 2)
-        else:
-            slice_i = slice(i_clip_l, i_clip_r)
+            i_clip_r = -self.i_clip[i] // scaling
+        slice_i = slice(i_clip_l, i_clip_r)
 
         if j == 0:
             j_clip_l = 0
         else:
-            j_clip_l = self.j_clip[j - 1]
+            j_clip_l = self.j_clip[j - 1] // scaling
         if j >= self.N - 1:
             j_clip_r = None
         else:
-            j_clip_r = -self.j_clip[j]
-        if self.resolution > 2:
-            slice_j = slice(j_clip_l // 2, j_clip_r // 2)
-        else:
-            slice_j = slice(j_clip_l, j_clip_r)
+            j_clip_r = -self.j_clip[j] // scaling
+        slice_j = slice(j_clip_l, j_clip_r)
 
         return (slice_i, slice_j)
 
