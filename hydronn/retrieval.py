@@ -299,7 +299,10 @@ class Tiler:
             i_clip_r = None
         else:
             i_clip_r = -self.i_clip[i]
-        slice_i = slice(i_clip_l, i_clip_r)
+        if self.resolution > 2:
+            slice_i = slice(i_clip_l // 2, i_clip_r // 2)
+        else:
+            slice_i = slice(i_clip_l, i_clip_r)
 
         if j == 0:
             j_clip_l = 0
@@ -309,10 +312,10 @@ class Tiler:
             j_clip_r = None
         else:
             j_clip_r = -self.j_clip[j]
-        slice_j = slice(j_clip_l, j_clip_r)
-
         if self.resolution > 2:
-            return (slice_i // 2, slice_j // 2)
+            slice_j = slice(j_clip_l // 2, j_clip_r // 2)
+        else:
+            slice_j = slice(j_clip_l, j_clip_r)
 
         return (slice_i, slice_j)
 
