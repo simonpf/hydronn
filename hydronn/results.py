@@ -37,12 +37,14 @@ def process_file(filename):
         y = GAUGE_COORDS.y
         x_4 = GAUGE_COORDS.x_4
         y_4 = GAUGE_COORDS.y_4
-        return data.interp({
-            "x": x,
-            "y": y,
-            "x_4": x_4,
-            "y_4": y_4,
-        })
+        return data.interp(
+            {
+                "x": x,
+                "y": y,
+                "x_4": x_4,
+                "y_4": y_4,
+            }
+        )
     else:
         x = GAUGE_COORDS.x
         y = GAUGE_COORDS.y
@@ -111,8 +113,14 @@ def process_files(filenames):
     n = 0
     results = None
     variables = [
-        "mean_dep", "sample_dep", "mean_dep_c", "sample_dep_c", "mean_indep",
-        "sample_indep", "mean_indep_c", "sample_indep_c"
+        "mean_dep",
+        "sample_dep",
+        "mean_dep_c",
+        "sample_dep_c",
+        "mean_indep",
+        "sample_indep",
+        "mean_indep_c",
+        "sample_indep_c",
     ]
 
     for filename in filenames:
@@ -169,8 +177,14 @@ def calculate_accumulations(result_path, start=None, end=None):
     tasks = [pool.submit(process_files, f) for f in file_lists]
 
     variables = [
-        "mean_dep", "sample_dep", "mean_dep_c", "sample_dep_c", "mean_indep",
-        "sample_indep", "mean_indep_c", "sample_indep_c"
+        "mean_dep",
+        "sample_dep",
+        "mean_dep_c",
+        "sample_dep_c",
+        "mean_indep",
+        "sample_indep",
+        "mean_indep_c",
+        "sample_indep_c",
     ]
 
     result = None
@@ -184,7 +198,6 @@ def calculate_accumulations(result_path, start=None, end=None):
                 result[variable].data += data[variable].data
             result.attrs["files"] += data.attrs["files"]
 
-
     # Add latitude and longitude coordinates.
     data = decompress_and_load(files[0])
     lats = data.latitude.data[0]
@@ -192,12 +205,10 @@ def calculate_accumulations(result_path, start=None, end=None):
 
     if "x_4" in result.dims:
         lats = 0.25 * (
-            lats[0::2, 0::2] + lats[0::2, 1::2] +
-            lats[1::2, 0::2] + lats[1::2, 1::2]
+            lats[0::2, 0::2] + lats[0::2, 1::2] + lats[1::2, 0::2] + lats[1::2, 1::2]
         )
         lons = 0.25 * (
-            lons[0::2, 0::2] + lons[0::2, 1::2] +
-            lons[1::2, 0::2] + lons[1::2, 1::2]
+            lons[0::2, 0::2] + lons[0::2, 1::2] + lons[1::2, 0::2] + lons[1::2, 1::2]
         )
         result["latitude"] = (("x_4", "y_4"), lats)
         result["longitude"] = (("x_4", "y_4"), lons)

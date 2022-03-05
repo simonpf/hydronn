@@ -12,5 +12,3 @@ from pathlib import Path
 ROI = [-85, -40, -30, 10]
 
 HYDRONN_DATA_PATH = Path(__file__).parent.parent / "data"
-
-

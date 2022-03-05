@@ -49,13 +49,9 @@ def decompress_and_load(filename):
     filename = Path(filename)
     if not filename.exists():
         if Path(filename).suffix == ".gz":
-            raise ValueError(
-                f"The file '{filename}' doesn't exist. "
-            )
+            raise ValueError(f"The file '{filename}' doesn't exist. ")
         elif Path(filename).suffix == ".lz4":
-            raise ValueError(
-                f"The file '{filename}' doesn't exist. "
-            )
+            raise ValueError(f"The file '{filename}' doesn't exist. ")
         else:
             filename_gz = Path(str(filename) + ".gz")
             if not filename_gz.exists():
@@ -86,6 +82,7 @@ def decompress_and_load(filename):
         data = xr.open_dataset(filename)
     return data
 
+
 def plot_scenes(dataset, n=3):
 
     n_scenes = dataset.scenes.size
@@ -107,7 +104,6 @@ def plot_scenes(dataset, n=3):
         y = scene.y_.data
         z = scene.C08.data
         axs[i, 1].pcolormesh(x, y, z)
-
 
         x = scene.x_.data
         y = scene.y_.data
@@ -153,8 +149,13 @@ def plot_sample(x, y, n=3):
         print(sp[i].max())
         try:
             axs[i, 0].contour(
-                x_c, y_c, sp[i], norm=precip_norm, levels=levels, cmap="plasma",
-                alpha=0.5
+                x_c,
+                y_c,
+                sp[i],
+                norm=precip_norm,
+                levels=levels,
+                cmap="plasma",
+                alpha=0.5,
             )
         except:
             pass
@@ -163,8 +164,13 @@ def plot_sample(x, y, n=3):
         print(sp[i].max())
         try:
             axs[i, 0].contour(
-                x_c, y_c, sp[i], norm=precip_norm, levels=levels, cmap="plasma",
-                alpha=0.5
+                x_c,
+                y_c,
+                sp[i],
+                norm=precip_norm,
+                levels=levels,
+                cmap="plasma",
+                alpha=0.5,
             )
         except:
             pass
@@ -172,9 +178,13 @@ def plot_sample(x, y, n=3):
         axs[i, 2].pcolormesh(x_med, y_med, med_res[i, 0], cmap="Greys_r")
         try:
             axs[i, 1].contour(
-                x_c, y_c, sp[i], norm=precip_norm, levels=levels, cmap="plasma",
-                contour=0.5
-
+                x_c,
+                y_c,
+                sp[i],
+                norm=precip_norm,
+                levels=levels,
+                cmap="plasma",
+                contour=0.5,
             )
         except:
             pass
@@ -182,11 +192,17 @@ def plot_sample(x, y, n=3):
         axs[i, 3].pcolormesh(x_hi, y_hi, hi_res[i, 0], cmap="Greys_r")
         try:
             axs[i, 2].contour(
-                x_c, y_c, sp[i], norm=precip_norm, levels=levels, cmap="plasma",
-                contour=0.5
+                x_c,
+                y_c,
+                sp[i],
+                norm=precip_norm,
+                levels=levels,
+                cmap="plasma",
+                contour=0.5,
             )
         except:
             pass
+
 
 def adapt_gauge_precip(precip):
     result = precip.copy()
@@ -195,6 +211,7 @@ def adapt_gauge_precip(precip):
     non_zeros = precip >= 0.2
     result[non_zeros] += np.random.uniform(-0.1, 0.1, size=non_zeros.sum())
     return result
+
 
 def load_style():
     """
