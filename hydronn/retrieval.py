@@ -403,7 +403,12 @@ class Retrieval:
         model = self.model.model.to(device)
 
         x = input_data[0]
-        tiler = Tiler(x, tile_size=self.tile_size, overlap=self.overlap, resolution=self.model.resolution)
+        tiler = Tiler(
+            x,
+            tile_size=self.tile_size,
+            overlap=self.overlap,
+            resolution=self.model.resolution,
+        )
 
         sample_dep = []
         quantiles_dep = []
@@ -552,7 +557,6 @@ class Retrieval:
             [np.concatenate(r, -2) for r in quantiles_indep], -3
         )
         mean_indep = np.concatenate([np.concatenate(r, -1) for r in mean_indep], -2)
-
 
         dims = ("time", "x", "y")
         dims_r = ("time", "x", "y")
