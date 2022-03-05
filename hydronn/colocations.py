@@ -17,10 +17,12 @@ import xarray as xr
 
 from hydronn.definitions import ROI
 from hydronn.data.gpm import GPMCMBFile
-from hydronn.data.goes import (GOES16File,
-                               LOW_RES_CHANNELS,
-                               MED_RES_CHANNELS,
-                               HI_RES_CHANNELS)
+from hydronn.data.goes import (
+    GOES16File,
+    LOW_RES_CHANNELS,
+    MED_RES_CHANNELS,
+    HI_RES_CHANNELS,
+)
 
 
 LOGGER = logging.getLogger(__name__)
@@ -34,7 +36,8 @@ def add_channels(dataset):
         dataset: 'xarray.Dataset' containing GOES colocations.
 
     Return:
-        The same dataset with missing channels filled with NAN.
+        The same dataset with missing channels filled with NAN
+        values.
     """
     for i in range(1, 17):
         v = f"C{i:02}"
@@ -67,8 +70,7 @@ def add_channels(dataset):
     return dataset
 
 
-def extract_colocations(gpm_file,
-                        cache):
+def extract_colocations(gpm_file, cache):
     """
     Extract GOES/GPM colocations for a give GPMCMB file.
 
@@ -120,17 +122,15 @@ def extract_colocations(gpm_file,
 
         area = scene[f"C{channel:02}"].attrs["area"]
         lons, lats = area.get_lonlats()
-        gpm_swath = SwathDefinition(
-            lats=s.latitude.data,
-            lons=s.longitude.data
-        )
+        gpm_swath = SwathDefinition(lats=s.latitude.data, lons=s.longitude.data)
         surface_precip = kd_tree.resample_nearest(
             gpm_swath,
             s.surface_precip.data,
             area,
             radius_of_influence=4.0e3,
             epsilon=0.01,
-            fill_value=np.nan)
+            fill_value=np.nan,
+        )
 
         low_res_arrays = {}
         for c in goes_file.channels:
@@ -148,10 +148,12 @@ def extract_colocations(gpm_file,
         d_x = x_size - 256
         y_size = data_lr.y.size
         d_y = y_size - 256
-        data_lr = data_lr[{
-            "x": slice(d_x // 2 + d_x % 2, x_size - d_x // 2),
-            "y": slice(d_y // 2 + d_y % 2, y_size - d_y // 2)
-        }]
+        data_lr = data_lr[
+            {
+                "x": slice(d_x // 2 + d_x % 2, x_size - d_x // 2),
+                "y": slice(d_y // 2 + d_y % 2, y_size - d_y // 2),
+            }
+        ]
         datasets = [data_lr.reset_index(["x", "y"])]
 
         med_res_arrays = {}
@@ -168,10 +170,12 @@ def extract_colocations(gpm_file,
             d_x = x_size - 512
             y_size = data_mr.y.size
             d_y = y_size - 512
-            data_mr = data_mr[{
-                "x": slice(d_x // 2 + d_x % 2, x_size - d_x // 2),
-                "y": slice(d_y // 2 + d_y % 2, y_size - d_y // 2)
-            }].rename({"x": "x_1000", "y": "y_1000"})
+            data_mr = data_mr[
+                {
+                    "x": slice(d_x // 2 + d_x % 2, x_size - d_x // 2),
+                    "y": slice(d_y // 2 + d_y % 2, y_size - d_y // 2),
+                }
+            ].rename({"x": "x_1000", "y": "y_1000"})
             datasets.append(data_mr.reset_index(["x_1000", "y_1000"]))
 
         hi_res_arrays = {}
@@ -189,10 +193,12 @@ def extract_colocations(gpm_file,
             d_x = x_size - 1024
             y_size = data_hr.y.size
             d_y = y_size - 1024
-            data_hr = data_hr[{
-                "x": slice(d_x // 2 + d_x % 2, x_size - d_x // 2),
-                "y": slice(d_y // 2 + d_y % 2, y_size - d_y // 2)
-            }].rename({"x": "x_500", "y": "y_500"})
+            data_hr = data_hr[
+                {
+                    "x": slice(d_x // 2 + d_x % 2, x_size - d_x // 2),
+                    "y": slice(d_y // 2 + d_y % 2, y_size - d_y // 2),
+                }
+            ].rename({"x": "x_500", "y": "y_500"})
             datasets.append(data_hr.reset_index(["x_500", "y_500"]))
 
         dataset = add_channels(xr.merge(datasets))
@@ -200,7 +206,9 @@ def extract_colocations(gpm_file,
     if not scenes:
         return None
     coords = ["x_500_", "y_500_", "x_1000_", "y_1000_", "x_", "y_"]
-    dataset = xr.concat(scenes, dim="scenes", coords=coords, join="override").drop("crs")
+    dataset = xr.concat(scenes, dim="scenes", coords=coords, join="override").drop(
+        "crs"
+    )
     dataset["time_goes"] = ("scenes", goes_times)
     dataset["time_gpm"] = ("scenes", gpm_times)
     return dataset
