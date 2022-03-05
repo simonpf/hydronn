@@ -23,4 +23,6 @@ setup(
     project_urls={
         "Source": "https://github.com/simonpf/hydronn/",
     },
+    include_package_data=True,
+    package_data={'hydronn': ['files/*']},
 )

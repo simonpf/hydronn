@@ -15,6 +15,12 @@ import xarray as xr
 
 from hydronn.definitions import ROI
 
+
+###############################################################################
+# ImergFile
+###############################################################################
+
+
 class ImergFile:
     """
     Interface class to read IMERG data.
@@ -156,12 +162,16 @@ def load_and_interpolate_data(path, gauge_data):
     return dataset
 
 
-def calculate_accumulations(path):
+def calculate_accumulations(path, start=None, end=None):
     """
     Calculate accumulated precipitation.
 
     Args:
         path: Path to the folder containing the IMERG data.
+        start: Optional numpy.datetime64 specifying start of a time
+            interval over which to accumulate the precipitation.
+        end: Optional numpy.datetime64 specifying end of a time
+            interval over which to accumulate the precipitation.
 
     Return:
        xarray.Dataset containing the IMERG data accumulated
@@ -170,7 +180,19 @@ def calculate_accumulations(path):
     files = sorted(list(Path(path).glob("*.HDF5")))
     results = None
     for filename in files:
-        print(filename)
+
+        if start is not None and end is not None:
+            date = filename.name.split(".")[4]
+            year = date[:4]
+            month = date[4:6]
+            day = date[6:8]
+            hour = date[10:12]
+            minute = date[12:14]
+            second = date[14:16]
+            date = np.datetime64(f"{year}-{month}-{day}T{hour}:{minute}:{second}")
+            if date < start or date >= end:
+                continue
+
         data = ImergFile(filename).to_xarray_dataset(roi=ROI)
         if results is None:
             precip = data.surface_precip.data[0]

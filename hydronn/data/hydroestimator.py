@@ -196,7 +196,10 @@ def load_and_interpolate_data(data_path, gauge_data, correction=None):
     return dataset
 
 
-def calculate_accumulations(data_path, correction=None):
+def calculate_accumulations(data_path,
+                            correction=None,
+                            start=None,
+                            end=None):
     """
     Calculated accumulated and mean precipitation for the hydroestimator data.
 
@@ -204,6 +207,10 @@ def calculate_accumulations(data_path, correction=None):
         data_path: Folder containing the hydroestimator files to load.
         correction: Path to a text file specifying a quantile matching
             correction for the Hydroestimator data.
+        start: Optional numpy.datetime64 specifying start of a time
+            interval over which to accumulate the precipitation.
+        end: Optional numpy.datetime64 specifying end of a time
+            interval over which to accumulate the precipitation.
 
     Return:
         A 'xarray.Dataset' containing  accumulated and mean precipitation.
@@ -220,6 +227,18 @@ def calculate_accumulations(data_path, correction=None):
     counts = np.zeros((m, n), dtype=np.float32)
 
     for f in files:
+
+        date = f.name.split("_")[1].split(".")[0]
+        year = date[:4]
+        month = date[4:6]
+        day = date[6:8]
+        hour = date[8:10]
+        minute = date[10:12]
+        date = np.datetime64(f"{year}-{month}-{day}T{hour}:{minute}:00")
+        print(date)
+        if date < start or date >= end:
+            continue
+
         data = load_file(f, correction=correction)
         data = np.nan_to_num(data, 0.0)
         acc += data

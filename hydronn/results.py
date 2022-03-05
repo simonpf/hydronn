@@ -11,6 +11,7 @@ from pathlib import Path
 import xarray as xr
 
 from rich.progress import track
+import numpy as np
 
 from hydronn.utils import decompress_and_load
 
@@ -127,7 +128,7 @@ def process_files(filenames):
     return results
 
 
-def calculate_accumulations(result_path):
+def calculate_accumulations(result_path, start=None, end=None):
     """
     Interpolate hydronn retrieval results to gauge locations.
 
@@ -137,20 +138,35 @@ def calculate_accumulations(result_path):
 
     Args:
         results_path: The path in which to look for result files.
+        start: Optional numpy.datetime64 specifying start of a time
+            interval over which to accumulate the precipitation.
+        end: Optional numpy.datetime64 specifying end of a time
+            interval over which to accumulate the precipitation.
 
     Return:
         'xarray.Dataset' containing the accumulated and average precipitation.
     """
     result_path = Path(result_path)
 
-    files = sorted(list(result_path.glob("**/*.nc.gz")))
+    all_files = sorted(list(result_path.glob("**/*.nc.gz")))
+    files = []
+    for f in all_files:
+        if start is not None and end is not None:
+            parts = f.name.split(".")[0].split("_")
+            year = parts[2]
+            month = parts[3]
+            day = parts[4]
+            hour = parts[5]
+            date = np.datetime64(f"{year}-{month}-{day}T{hour}:00:00")
+            print(date)
+            if date < start or date >= end:
+                continue
+        files.append(f)
+
     file_lists = split_list(files, 6)
 
     pool = ProcessPoolExecutor(max_workers=12)
-
     tasks = [pool.submit(process_files, f) for f in file_lists]
-    for f in files:
-        pool.submit(process_file, f)
 
     variables = [
         "mean_dep", "sample_dep", "mean_dep_c", "sample_dep_c", "mean_indep",

@@ -3,11 +3,13 @@
 hydronn.data.gpm
 ================
 
-This module provides functions to read level 2B files of the GPM
-combined product, which is used to train they hydronn algorithm.
+This module provides functions to download and read level 2B
+ files of the GPM combined product, which is used to generate
+ the training data for the Hydronn retrieval.
 """
 from datetime import datetime
 from pathlib import Path
+import tempfile
 from urllib.parse import urlparse
 
 import numpy as np
@@ -16,8 +18,11 @@ import xarray as xr
 from pansat.download.providers.ges_disc import GesdiscProvider
 
 
-GPM_FILES = open(Path(__file__).parent / "gpm_files.txt").readlines()
+GPM_FILES = open(Path(__file__).parent / "../files/gpm_files.txt").readlines()
 GPM_FILES = [name.strip() for name in GPM_FILES]
+
+from pansat.download.providers.ges_disc import GesdiscProvider
+
 
 def get_gpm_files(year, day):
     """
