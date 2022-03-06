@@ -51,15 +51,10 @@ def read_data(path):
 
     datasets = []
 
-
     for f in files:
         print(f)
-        dates = np.loadtxt(
-            f, dtype=np.datetime64, skiprows=1, usecols=0, delimiter=","
-        )
-        precip_rates = np.loadtxt(
-            f, skiprows=1, usecols=range(1, 25), delimiter=","
-        )
+        dates = np.loadtxt(f, dtype=np.datetime64, skiprows=1, usecols=0, delimiter=",")
+        precip_rates = np.loadtxt(f, skiprows=1, usecols=range(1, 25), delimiter=",")
         hours = np.timedelta64(1, "h") * np.arange(24)
         dates = dates.reshape(-1, 1) + hours.reshape(1, -1)
         dates = dates.reshape(-1)
@@ -72,7 +67,7 @@ def read_data(path):
             "gauges": (("gauges",), [gauge_id]),
             "state": (("gauges",), [state]),
             "longitude": (("gauges",), [lon]),
-            "latitude": (("gauges",), [lat])
+            "latitude": (("gauges",), [lat]),
         }
         datasets.append(xr.Dataset(dataset))
 

@@ -330,11 +330,7 @@ class HydronnGeneric(nn.Module):
         self.down_block_2 = DownsamplingBlock(n_features_body, n_blocks[0])
         self.down_block_4 = DownsamplingBlock(n_features_body, n_blocks[1])
         self.down_block_8 = DownsamplingBlock(n_features_body, n_blocks[2])
-        self.down_block_16 = DownsamplingBlock(n_features_body, n_blocks[3])
-        self.down_block_32 = DownsamplingBlock(n_features_body, n_blocks[4])
 
-        self.up_block_16 = UpsamplingBlock(n_features_body)
-        self.up_block_8 = UpsamplingBlock(n_features_body)
         self.up_block_4 = UpsamplingBlock(n_features_body)
         self.up_block_2 = UpsamplingBlock(n_features_body)
         self.up_block = UpsamplingBlock(n_features_body)
@@ -344,7 +340,7 @@ class HydronnGeneric(nn.Module):
                 n_features_body + n_inputs, n_features_head, n_outputs, n_layers_head
             )
         else:
-            self.head = {
+            self.head = nn.ModuleDict({
                 t: MLPHead(
                     n_features_body + n_inputs,
                     n_features_head,
@@ -352,31 +348,24 @@ class HydronnGeneric(nn.Module):
                     n_layers_head,
                 )
                 for t in targets
-            }
+            })
 
     def forward(self, x):
         """
         Propagate input through block.
         """
-        low_res, med_res, hi_res = x
+        x_in = self.block_in(x)
 
-        x_in = self.avg_in(low_res[:, [-4]])
-        x = self.block_in(x_in)
-
-        x_2 = self.down_block_2(x)
+        x_2 = self.down_block_2(x_in)
         x_4 = self.down_block_4(x_2)
         x_8 = self.down_block_8(x_4)
-        x_16 = self.down_block_16(x_8)
-        x_32 = self.down_block_32(x_16)
 
-        x_16_u = self.up_block_16(x_32, x_16)
-        x_8_u = self.up_block_8(x_16_u, x_8)
-        x_4_u = self.up_block_4(x_8_u, x_4)
+        x_4_u = self.up_block_4(x_8, x_4)
         x_2_u = self.up_block_2(x_4_u, x_2)
-        x_u = self.up_block(x_2_u, x)
+        x_u = self.up_block(x_2_u, x_in)
 
-        torch.cat([x_u, x_in], axis=1)
-        if isinstance(self.head, dict):
-            return {k: h(x_in) for k, h in self.head.values()}
+        x_in = torch.cat([x_u, x], axis=1)
+        if isinstance(self.head, nn.ModuleDict):
+            return {k: h(x_in) for k, h in self.head.items()}
         else:
-            return self.head
+            return self.head(x_in)

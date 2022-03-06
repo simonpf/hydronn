@@ -4,7 +4,8 @@ import re
 
 import numpy as np
 import pandas as pd
-#import torch
+
+# import torch
 import xarray as xr
 
 
@@ -93,9 +94,7 @@ class GOES16File:
     """
 
     @staticmethod
-    def download(time,
-                 cache=None,
-                 no_cache=False):
+    def download(time, cache=None, no_cache=False):
         """
         Cached download of GOES files.
 
@@ -127,9 +126,7 @@ class GOES16File:
 
         try:
             filenames = provider.get_files_in_range(
-                start_time,
-                end_time,
-                start_inclusive=False
+                start_time, end_time, start_inclusive=False
             )
         except Exception:
             return None
@@ -183,9 +180,7 @@ class GOES16File:
         for time in start_times:
             time_s = time.strftime("%Y%j%H%M%S")
             pattern = f"OR_ABI-L1b-RadF-*s{time_s}*.nc"
-            channel_files = list(
-                Path(path).glob(f"**/{pattern}")
-            )
+            channel_files = list(Path(path).glob(f"**/{pattern}"))
             files.append(GOES16File(channel_files))
         return files
 
@@ -198,6 +193,7 @@ class GOES16File:
                 for each of the channels.
         """
         from satpy import Scene
+
         start_times = get_start_times(channel_files)
         self.start_time = min(start_times)
         tds = [(t - self.start_time).total_seconds() for t in start_times]
@@ -227,7 +223,7 @@ class GOES16File:
             if channel_name in self.scene.available_dataset_names():
                 self.scene.load([channel_name])
                 x = self.scene[channel_name]
-                x = x[2 * ROW_START: 2 * ROW_END, 2 * COL_START: 2 * COL_END]
+                x = x[2 * ROW_START : 2 * ROW_END, 2 * COL_START : 2 * COL_END]
                 x = x.load()
                 x.close()
                 x = x.data.astype(np.float32)
@@ -238,7 +234,7 @@ class GOES16File:
             if channel_name in self.scene.available_dataset_names():
                 self.scene.load([channel_name])
                 x = self.scene[channel_name]
-                x = x[4 * ROW_START: 4 * ROW_END, 4 * COL_START: 4 * COL_END]
+                x = x[4 * ROW_START : 4 * ROW_END, 4 * COL_START : 4 * COL_END]
                 x = x.load()
                 x.close()
                 x = x.data.astype(np.float32)
@@ -298,11 +294,7 @@ class GOES16File:
             med_res = normalizer[1](med_res[np.newaxis])
             hi_res = normalizer[2](hi_res[np.newaxis])
 
-        return (
-            torch.tensor(low_res),
-            torch.tensor(med_res),
-            torch.tensor(hi_res)
-        )
+        return (torch.tensor(low_res), torch.tensor(med_res), torch.tensor(hi_res))
 
     def get_input_data(self):
         """
@@ -317,28 +309,30 @@ class GOES16File:
         lons, lats = area.get_lonlats()
 
         start_time = pd.Timestamp(self.start_time).to_datetime64()
-        input_data = xr.Dataset({
-            "time": (("time",), [start_time]),
-            "longitude": (("time", "x", "y"), lons[np.newaxis]),
-            "latitude": (("time", "x", "y"), lats[np.newaxis]),
-        })
+        input_data = xr.Dataset(
+            {
+                "time": (("time",), [start_time]),
+                "longitude": (("time", "x", "y"), lons[np.newaxis]),
+                "latitude": (("time", "x", "y"), lats[np.newaxis]),
+            }
+        )
 
         for c in LOW_RES_CHANNELS:
             if c in inputs:
-                input_data[f"C{c:02}"] = (
-                    ("time", "x", "y"), inputs[c][np.newaxis]
-                )
+                input_data[f"C{c:02}"] = (("time", "x", "y"), inputs[c][np.newaxis])
 
         for c in MED_RES_CHANNELS:
             if c in inputs:
                 input_data[f"C{c:02}"] = (
-                    ("time", "x_1000", "y_1000"), inputs[c][np.newaxis]
+                    ("time", "x_1000", "y_1000"),
+                    inputs[c][np.newaxis],
                 )
 
         for c in HI_RES_CHANNELS:
             if c in inputs:
                 input_data[f"C{c:02}"] = (
-                    ("time", "x_500", "y_500"), inputs[c][np.newaxis]
+                    ("time", "x_500", "y_500"),
+                    inputs[c][np.newaxis],
                 )
 
         return input_data

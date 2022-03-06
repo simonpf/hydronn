@@ -23,6 +23,7 @@ class Correction:
     be applied to any array of rain rates returning the corrected
     rain rates.
     """
+
     def __init__(self, filename):
         """
         Load correction data.
@@ -139,15 +140,15 @@ def load_data(data_path):
 
     latitude, longitude = get_lats_and_lons()
 
-    dataset = xr.Dataset({
-        "latitude": latitude,
-        "longitude": longitude,
-        "time": time,
-        "surface_precip": (("time", "latitude", "longitude"), data)
-    })
+    dataset = xr.Dataset(
+        {
+            "latitude": latitude,
+            "longitude": longitude,
+            "time": time,
+            "surface_precip": (("time", "latitude", "longitude"), data),
+        }
+    )
     return dataset
-
-
 
 
 def load_and_interpolate_data(data_path, gauge_data, correction=None):
@@ -188,18 +189,17 @@ def load_and_interpolate_data(data_path, gauge_data, correction=None):
     times = np.stack(times)
     precip = np.stack(precip, axis=-1)
 
-    dataset = xr.Dataset({
-        "gauges": (("gauges",), gauge_data.gauges.data),
-        "time": (("time",), times),
-        "surface_precip": (("gauges", "time"), precip)
-    })
+    dataset = xr.Dataset(
+        {
+            "gauges": (("gauges",), gauge_data.gauges.data),
+            "time": (("time",), times),
+            "surface_precip": (("gauges", "time"), precip),
+        }
+    )
     return dataset
 
 
-def calculate_accumulations(data_path,
-                            correction=None,
-                            start=None,
-                            end=None):
+def calculate_accumulations(data_path, correction=None, start=None, end=None):
     """
     Calculated accumulated and mean precipitation for the hydroestimator data.
 
@@ -245,11 +245,13 @@ def calculate_accumulations(data_path,
         counts += (data >= 0).astype(np.float32)
 
     mean = acc / counts
-    dataset = xr.Dataset({
-        "latitude": latitude,
-        "longitude": longitude,
-        "surface_precip_acc": (("latitude", "longitude"), acc),
-        "surface_precip_mean": (("latitude", "longitude"), mean),
-        "counts": (("latitude", "longitude"), counts)
-    })
+    dataset = xr.Dataset(
+        {
+            "latitude": latitude,
+            "longitude": longitude,
+            "surface_precip_acc": (("latitude", "longitude"), acc),
+            "surface_precip_mean": (("latitude", "longitude"), mean),
+            "counts": (("latitude", "longitude"), counts),
+        }
+    )
     return dataset

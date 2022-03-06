@@ -25,12 +25,9 @@ class ImergFile:
     """
     Interface class to read IMERG data.
     """
+
     @classmethod
-    def load_files(cls,
-                   path,
-                   start_time=None,
-                   end_time=None,
-                   roi=None):
+    def load_files(cls, path, start_time=None, end_time=None, roi=None):
         """
         Load all files from a given folder and concatenate results.
 
@@ -53,10 +50,7 @@ class ImergFile:
         start_times = []
         for f in files:
             parts = f.stem.split(".")[4].split("-")[:2]
-            start_times.append(datetime.strptime(
-                "".join(parts),
-                "%Y%m%dS%H%M%S"
-            ))
+            start_times.append(datetime.strptime("".join(parts), "%Y%m%dS%H%M%S"))
 
         matching = []
         if start_time is not None and end_time is not None:
@@ -81,7 +75,6 @@ class ImergFile:
         end = datetime.strptime(parts[0] + parts[2], "%Y%m%dE%H%M%S")
         self.start_time = start
         self.end_time = end
-
 
     def to_xarray_dataset(self, roi=None):
         """
@@ -125,14 +118,16 @@ class ImergFile:
         end = pd.Timestamp(self.end_time).to_datetime64()
         time = start + 0.5 * (end - start)
 
-        dataset = xr.Dataset({
-            "latitude": (("latitude",), lats),
-            "longitude": (("longitude",), lons),
-            "time": (("time",), [time]),
-            "lat_bounds": (("lat_bounds"), lat_bounds),
-            "lon_bounds": (("lon_bounds"), lon_bounds),
-            "surface_precip": (("time", "longitude", "latitude"), precip)
-        })
+        dataset = xr.Dataset(
+            {
+                "latitude": (("latitude",), lats),
+                "longitude": (("longitude",), lons),
+                "time": (("time",), [time]),
+                "lat_bounds": (("lat_bounds"), lat_bounds),
+                "lon_bounds": (("lon_bounds"), lon_bounds),
+                "surface_precip": (("time", "longitude", "latitude"), precip),
+            }
+        )
 
         return dataset
 
@@ -154,10 +149,14 @@ def load_and_interpolate_data(path, gauge_data):
     for filename in files:
         print(filename)
         data = ImergFile(filename).to_xarray_dataset(roi=ROI)
-        datasets.append(data.interp({
-            "latitude": gauge_data.latitude,
-            "longitude": gauge_data.longitude,
-        }))
+        datasets.append(
+            data.interp(
+                {
+                    "latitude": gauge_data.latitude,
+                    "longitude": gauge_data.longitude,
+                }
+            )
+        )
     dataset = xr.concat(datasets, dim="time")
     return dataset
 
@@ -200,12 +199,14 @@ def calculate_accumulations(path, start=None, end=None):
             lons = data.longitude.data
             lats = data.latitude.data
 
-            results = xr.Dataset({
-                "latitude": (("latitude",), lats),
-                "longitude": (("longitude",), lons),
-                "counts": (("longitude", "latitude"), counts),
-                "surface_precip": (("longitude", "latitude"), precip),
-            })
+            results = xr.Dataset(
+                {
+                    "latitude": (("latitude",), lats),
+                    "longitude": (("longitude",), lons),
+                    "counts": (("longitude", "latitude"), counts),
+                    "surface_precip": (("longitude", "latitude"), precip),
+                }
+            )
         else:
             precip = data.surface_precip.data[0]
             counts = 0.5 * (precip >= 0).astype(np.float32)

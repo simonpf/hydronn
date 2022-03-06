@@ -90,10 +90,7 @@ class GPMCMBFile:
         """
         self.filename = Path(filename)
         time = self.filename.stem.split(".")[4][:-8]
-        self.start_time = datetime.strptime(
-            time,
-            "%Y%m%d-S%H%M%S"
-        )
+        self.start_time = datetime.strptime(time, "%Y%m%d-S%H%M%S")
 
     def to_xarray_dataset(self, roi=None):
         """
@@ -108,18 +105,21 @@ class GPMCMBFile:
                  within the given bounding box will be returned.
         """
         from h5py import File
+
         with File(str(self.filename), "r") as data:
 
-            data = data['NS']
+            data = data["NS"]
             latitude = data["Latitude"][:]
             longitude = data["Longitude"][:]
 
             if roi is not None:
                 lon_0, lat_0, lon_1, lat_1 = roi
-                inside = ((longitude >= lon_0) *
-                          (latitude >= lat_0) *
-                          (longitude < lon_1) *
-                          (latitude < lat_1))
+                inside = (
+                    (longitude >= lon_0)
+                    * (latitude >= lat_0)
+                    * (longitude < lon_1)
+                    * (latitude < lat_1)
+                )
                 inside = np.any(inside, axis=1)
                 i_start, i_end = np.where(inside)[0][[0, -1]]
             else:
@@ -135,17 +135,19 @@ class GPMCMBFile:
                 "day": data["ScanTime"]["DayOfMonth"][i_start:i_end],
                 "hour": data["ScanTime"]["Hour"][i_start:i_end],
                 "minute": data["ScanTime"]["Minute"][i_start:i_end],
-                "second": data["ScanTime"]["Second"][i_start:i_end]
+                "second": data["ScanTime"]["Second"][i_start:i_end],
             }
             date = pd.to_datetime(date)
             surface_precip = data["surfPrecipTotRate"][i_start:i_end]
 
-            dataset = xr.Dataset({
-                "scan_time": (("scans",), date),
-                "latitude": (("scans", "pixels"), latitude),
-                "longitude": (("scans", "pixels"), longitude),
-                "surface_precip": (("scans", "pixels"), surface_precip)
-            })
+            dataset = xr.Dataset(
+                {
+                    "scan_time": (("scans",), date),
+                    "latitude": (("scans", "pixels"), latitude),
+                    "longitude": (("scans", "pixels"), longitude),
+                    "surface_precip": (("scans", "pixels"), surface_precip),
+                }
+            )
             return dataset
 
     def extract_scenes(self, roi, scans_per_scene):
@@ -163,6 +165,7 @@ class GPMCMBFile:
         """
         dataset = self.to_xarray_dataset(roi=roi)
         return extract_scenes(dataset, scans_per_scene)
+
 
 GPM_FILES_SORTED = {}
 for f in GPM_FILES:

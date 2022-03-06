@@ -25,15 +25,18 @@ class HydronnDataset:
     Training dataset consisting of GOES16 observations and co-located surface
     precipitation from GPM combined retrievals.
     """
-    def __init__(self,
-                 filename,
-                 batch_size=4,
-                 shuffle=True,
-                 normalize=True,
-                 normalizer=None,
-                 augment=True,
-                 resolution=2,
-                 ir=False):
+
+    def __init__(
+        self,
+        filename,
+        batch_size=4,
+        shuffle=True,
+        normalize=True,
+        normalizer=None,
+        augment=True,
+        resolution=2,
+        ir=False,
+    ):
         """
         Load training data.
 
@@ -56,7 +59,7 @@ class HydronnDataset:
         self.resolution = resolution
         self.ir = ir
 
-        seed = random.SystemRandom().randint(0, 2 ** 16)
+        seed = random.SystemRandom().randint(0, 2**16)
         self.rng = np.random.default_rng(seed)
 
         self.load_data()
@@ -64,13 +67,12 @@ class HydronnDataset:
         # Normalize input data if necessary.
         if normalize:
             if normalizer is None:
-                normalizer = tuple([
-                    MinMaxNormalizer(x) for x in [
-                        self.low_res,
-                        self.med_res,
-                        self.hi_res
+                normalizer = tuple(
+                    [
+                        MinMaxNormalizer(x)
+                        for x in [self.low_res, self.med_res, self.hi_res]
                     ]
-                ])
+                )
             self.normalizer = normalizer
             self.low_res = self.normalizer[0](self.low_res)
             self.med_res = self.normalizer[1](self.med_res)
@@ -114,15 +116,18 @@ class HydronnDataset:
         """
         data = decompress_and_load(self.filename)
         hi_res = data["C02"].data[:, np.newaxis].astype(np.float32)
-        med_res = np.stack([
-            data["C01"].data.astype(np.float32),
-            data["C03"].data.astype(np.float32),
-            data["C05"].data.astype(np.float32),
-            ], axis=1)
-        low_res = np.stack([
-            data[f"C{i:02}"].astype(np.float32)
-            for i in [4] + list(range(6, 17))
-        ], axis=1)
+        med_res = np.stack(
+            [
+                data["C01"].data.astype(np.float32),
+                data["C03"].data.astype(np.float32),
+                data["C05"].data.astype(np.float32),
+            ],
+            axis=1,
+        )
+        low_res = np.stack(
+            [data[f"C{i:02}"].astype(np.float32) for i in [4] + list(range(6, 17))],
+            axis=1,
+        )
         surface_precip = data.surface_precip.data.astype(np.float32).copy()
         if self.resolution > 2:
             surface_precip = surface_precip[:, ::2, ::2]
@@ -160,14 +165,12 @@ class HydronnDataset:
             self.surface_precip[indices] = np.flip(self.surface_precip[indices], -1)
 
             indices = self.rng.random(n_scenes) > 0.5
-            self.low_res[indices] = np.transpose(self.low_res[indices],
-                                                 [0, 1, 3, 2])
-            self.med_res[indices] = np.transpose(self.med_res[indices],
-                                                 [0, 1, 3, 2])
-            self.hi_res[indices] = np.transpose(self.hi_res[indices],
-                                                [0, 1, 3, 2])
-            self.surface_precip[indices] = np.transpose(self.surface_precip[indices],
-                                                        [0, 2, 1])
+            self.low_res[indices] = np.transpose(self.low_res[indices], [0, 1, 3, 2])
+            self.med_res[indices] = np.transpose(self.med_res[indices], [0, 1, 3, 2])
+            self.hi_res[indices] = np.transpose(self.hi_res[indices], [0, 1, 3, 2])
+            self.surface_precip[indices] = np.transpose(
+                self.surface_precip[indices], [0, 2, 1]
+            )
 
     def __len__(self):
         n_scenes = self.low_res.shape[0]
@@ -199,4 +202,3 @@ class HydronnDataset:
         precip = self.surface_precip[i_start:i_end]
         y = torch.tensor(precip)
         return (x, y)
-
