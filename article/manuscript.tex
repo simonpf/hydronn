@@ -75,13 +75,13 @@
 %\usepackage{subfig}
 %\usepackage{rotating}
 
-\newcommand{\hydronntwo}{Hydronn$_{2}$}
-\newcommand{\hydronnfourall}{Hydronn$_{4}$}
+\newcommand{\hydronntwo}{Hydronn$_{2, \text{All}}$}
+\newcommand{\hydronnfourall}{Hydronn$_{4, \text{All}}$}
 \newcommand{\hydronnfourir}{Hydronn$_{4, \text{IR}}$}
 
 \begin{document}
 
-\title{An improved nowcasting precipitation retrieval for Brazil}
+\title{An improved near real-time precipitation retrieval for Brazil}
 
 
 % \Author[affil]{given_name}{surname}
@@ -89,10 +89,12 @@
 \Author[1]{Simon}{Pfreundschuh}
 \Author[1]{Ingrid}{Ingemarsson}
 \Author[1]{Patrick}{Eriksson}
-\Author[1]{Daniel Alejandor}{Vila}
-\Author[1]{Alan}{Calheiros}
+\Author[2]{Daniel A.}{Vila}
+\Author[3]{Alan J. P.}{Calheiros}
 
-\affil[1]{Department of Space, Earth and Environment, Chalmers University of Technology, 41296 Gothenburg, Sweden}
+\affil[1]{Department of Space, Earth and Environment, Chalmers University of Technology, Gothenburg, Sweden}
+\affil[2]{Regional office for the Americas, World Meteorological Organization, Asunción, Paraguay}
+\affil[3]{Coordination of Applied Research and Technological Development, National Institute for Space Research (INPE), São José dos Campos, Brazil}
 
 %% The [] brackets identify the author with the corresponding affiliation. 1, 2, 3, etc. should be inserted.
 
@@ -127,42 +129,203 @@
 
 
 \begin{abstract}
+  Observations from geostationary satellites offer the unique ability to provide
+  spatially continuous coverage at continental scales with high spatial and
+  temporal resolution. Because of this, they are commonly used to complement
+  ground-based measurements of precipitation, whose coverage is often more
+  limited.
+
+  We present a novel, neural-network-based, near real-time precipitation
+  retrieval for Brazil based on visible and infrared (VIS/IR) observations from
+  the Advanced Baseline Imager  on the Geostationary Operational
+  Environmental Satellite 16. The retrieval, which employs a convolutional
+  neural network to perform Bayesian retrievals of precipitation, was developed
+  with the aims of (1) leveraging the full potential of latest-generation
+  geostationary observations and (2) providing probabilistic precipitation
+  estimates with well-calibrated uncertainties. The retrieval is trained using
+  co-locations with combined radar and radiometer retrievals from the Global
+  Precipitation Measurement (GPM)  Core Observatory. Its accuracy is
+  assessed using one month of gauge measurements and compared to the
+  precipitation retrieval that is currently in operational use at the Brazilian
+  Institute for Space Research as well as two state-of-the-art global
+  precipitation products: The Precipitation Estimation from Remotely Sensed
+  Information using Artificial Neural Networks Cloud Classification System and
+  the Integrated Multi-Satellite Retrievals for GPM (IMERG). Even in its most
+  basic configuration, the accuracy of the proposed retrieval is similar to that
+  of IMERG, which merges retrievals from VIS/IR and microwave observations with
+  gauge measurements. In its most advanced configuration, the retrieval reduces
+  the mean absolute error for hourly accumulations by $22\ \unit{\%}$ compared
+  the currently operational retrieval, by $50\ \unit{\%}$ for the MSE and
+  increases the correlation by $400\ \unit{\%}$. Compared to IMERG, the
+  improvements correspond to  $15\ \unit{\%}$, $15\ \unit{\%}$ and
+  $39\ \unit{\%}$, respectively. Furthermore, we show that the probabilistic
+  retrieval is well calibrated against gauge measurements when differences in a
+  priori distributions are accounted for.
+
+  In addition to potential improvements in near real time precipitation
+  estimation over Brazil, our findings highlight the potential of specialized
+  data driven retrievals that are made possible through advances in
+  geostationary sensor technology, the availability of high-quality reference
+  measurements from the GPM mission and modern machine learning techniques.
+  Furthermore, our results show the potential of probabilistic precipitation
+  retrievals to better characterize the observed precipitation
+  and provide more trustworthy retrieval results.
 \end{abstract}
 
 
 \introduction  %% \introduction[modified heading if necessary]
 
+Timely and highly-resolved measurements of precipitation constitute an important
+source of information for weather forecasting, disaster response and
+hydrological modeling. These measurements can be provided by dense radar and
+gauge networks but their coverage is typically limited in less populated
+regions. However, even where these measurements are available, they are not
+necessarily without issues. The ability of rain gauges measurements to
+truthfully represent spatial precipitation statistics at larger scales is
+limited by their extreme localization \citep{smith96}. Ground-based
+precipitation radars are affected by beam blocking as well as measurement errors
+caused by the varying altitude of the radar beam along its range
+\citep{holleman07}.
 
-\section{Data and methods}
+Since satellite observations provide continuous spatial coverage, they are well
+suited to complement the measurements from gauges and ground radars. Microwave
+observations generally provide the most direct space-borne measurements of
+precipitation because of their sensitivity to emission and scattering from
+precipitating hydrometeors. Unfortunately, due to their comparably low spatial
+resolution, these sensors are currently employed only on polar orbiting
+platforms. Since this limits the width of the satellite swath, a large
+constellation of sensors on different platforms is required to achieve low
+revisit times. This approach is pursued by the Global Precipitation Measurement
+(GPM, \citeauthor{hou14}, \citeyear{hou14}). Nonetheless, the revisit times for
+the passive microwave sensors of the GPM constellation still exceed 2 hours ins
+the tropics.
 
-This section introduces the rain gauge measurements that are used as reference
-data in this study together with the retrieval algorithms that the Hydronn
-retrieval will be evaluated against. Following this, the implementation of the
-hydronn retrieval is presented.
+Visible and infrared (VIS/IR) observations from the latest generation of
+geostationary satellites \citep{schmit05} provide spatial resolutions between
+0.5 and $2\ \unit{km}$ at the sub-satellite point and a temporal resolution of
+up to 10 minutes for full disk observations. The disadvantage of these
+observations for measuring precipitation is that they are mostly sensitive to
+the top of clouds, which are only indirectly related to the precipitation near
+the surface. Their unrivaled spatial and temporal resolution nonetheless makes
+them a valuable source of information for satellite-based precipitation
+estimates.
+
+The operational use of geostationary VIS/IR observations for precipitation
+retrievals dates back more than 40 years \citep{scofield77} and a large number
+of different algorithms have been developed over the years \citep{arkin87,
+  adler88, vicente98, sorooshian00, kuligowski02, roderick03, hong04,
+  kuligowski16}. Due to the aforementioned indirect relationship between
+observations and precipitation, nearly all of these methods are based on
+empirical relationships derived from satellite observations co-located with
+reference data derived from more direct measurement techniques such as
+ground-based radar. Moreover, operational retrievals often require corrections
+to improve the accuracy of their estimates. The Self-Calibrating Real-Time GOES
+Rainfall Algorithm for Short-Term Rainfall Estimates (SCamPR,
+\citeauthor{kuligowski16} \citeyear{kuligowski16}), for example, is dynamically
+calibrated using the latest available microwave precipitation estimates.
+Similarly, the PERSIANN CSS real time dataset is in the process of being
+superseded by the PERSIANN PDIR algorithm, which extends the PERSIANN CCS
+algorithm with a regional correction.
+
+%Differences between algorithms arise with respect to the assumed form of the
+%empirical relationship and the input observations: The Autoestimator
+%\citep{vicente98} and Hydroestimator \citep{roderick03} are based on an assumed
+%power-law relationship between $10.7\ \unit{\mu m}$ IR observations and surface
+%precipitation. The PERSIANN retrieval \citep{hsu97} uses a neural network to
+%classify cloud pixels and map them to precipitation rates. The PERSIANN cloud
+%classification system (CCS) \citep{hong04} extends this approach by using a
+%neural network to classify cloud pixels and then applying different empirical
+%power-law relationships relating cloud top temperature to precipitation rates.
+%Operational algorithms also typically employ a range of corrections to improve
+%retrieval results across meteorological and climatic regimes.
+
+Another example is the HYDRO precipitation retrieval that is currently in
+operational use at the National Institute for Space Resarch (INPE) in Brazil,
+which is based on the Hydroestimator algorithm \citep{scofield03}. It employs an
+empirical relationship between the $10.7\ \unit{\mu m}$ IR channel and
+precipitation rates with additional corrections. To adapt it for application
+over South America yet another correction was derived by \citet{siqueira19},
+which improved the accuracy of precipitation accumulations but not that of
+instantaneous precipitation rates.
+
+A common shortcoming of all retrieval algorithms discussed above is that they
+neglect retrieval uncertainties. The retrieval of precipitation rates from
+VIS/IR observations constitutes an inverse problem that is strongly
+underconstrained. This is true even for microwave based retrievals and likely
+exacerbated by the less direct information content in the VIS/IR observations.
+The ill-posed character of the retrieval problem leads to significant retrieval
+uncertainties. Providing probabilistic estimates that quantify these
+uncertainties would help the characterization of precipitation estimates and
+thus increase their usefulness.
+
+This study presents Hydronn, a novel real-time precipitation retrieval that uses
+VIS/IR observations from the GOES 16 Advanced Baseline Imager (ABI,
+\citeauthor{schmit18}, \citeyear{schmit18}) to retrieve precipitation over
+Brazil. It was designed with two aims: (1) To leverage the full potential of
+observations from the latest generation of geostationary sensors and (2) to
+develop a Bayesian precipitation retrieval algorithm that can provide well
+calibrated uncertainty estimates. The algorithm is trained using a large
+database of co-locations between observations from the ABI and the combined
+radar-radiometer retrievals from the GPM Core Observatory \citep{grecu16} . The
+accuracy of the retrieval is evaluated using a month of gauge measurements. To
+assess its performance with respect to existing retrievals it is compared to the
+currently operational HYDRO algorithm as well as two other commonly used
+precipitation products: The hourly Precipitation Estimation from Remotely Sensed
+Information using Artificial Neural Networks Cloud Classification System
+(PERSIANN CCS, \citeauthor{hong04}, \citeyear{hong04}) , which is based on IR
+observations only, and the Integrated Multi-Satellite Retrievals for GPM (IMERG,
+\citeauthor{huffman20} \citeyear{huffman20}), which combines observations from
+microwave, geostationary sensors and rain gauges.
+
+%The remainder of the article is structured as follows:
+%Section~\ref{sec:data_and_methods} introduces the data product that are provide
+%the benchmark estimates in this study, followed by a description of the Hydronn
+%retrieval algorithm. Section~\ref{sec:results} first evaluates the different
+%configurations of Hydronn on separate test data and then assesses their accuracy
+%against the benchmark algorithms on the gauge data. Setion~\ref{sec:discussion}
+%discusses the results in the more general context of the development of
+%precipitation retrievals while Sec.~\ref{sec:conclusions} summarizes the main
+%results of this study.
+
+
+\section{Data}
+
+This section presents the rain gauge data, which serve as reference measurements
+for this study, as well as the baseline algorithms to which Hydronn will be
+compared. This is followed by a description of the Hydronn retrieval algorithm.
 
 \subsection{Rain gauge data}
 
-The rain gauge measurement that are used in this study were compiled by the
-Institute for Space Research (INPE) and consists of hourly gauge measurements
-covering the time range May 2000 until May 2020. From this data December of
-2020 will be used for the evaluation of the Hydronn retrieval while the data
-from 2018 and 2019 will be used to derive a priori corrections.
+The rain gauge measurements that are used in this study were compiled by the
+National Institute of Meteorology of Brazil and consists of hourly gauge
+measurement covering the time range May 2000 until May 2020. From this data
+December of 2020 will be used for the evaluation of Hydronn. Data from 2018 and
+2019 is used to derive correction factors for the calibration of the hourly
+precipitation estimates produced by Hydronn, as will be described in
+Sec.~\ref{sec:correction} below.
 
-The geographical distribution and the mean precipitation during December 2012 of
-gauges is displayed in Fig.~\ref{fig:gauges}. While the gauge density is fairly
-high on the south-western coast of Brazil it decreases markedly towards the
-North-West. The highest precipitation is observed on the lower-central west
-coast of the country extending into the north west. Very low precipitation rates
-are observed in the north east.
+From all available gauge stations only those with a data availability exceeding
+$90\ \unit{\%}$ during December 2020 were selected. Their geographical
+distribution is displayed together with the mean precipitation in
+Fig.~\ref{fig:gauges}. While the gauge density is fairly high on the
+south-eastern coast of Brazil, it decreases markedly towards the Northwest.
+Climatologically, the highest precipitation occurs in the Amazonas and
+surrounding regions in the Northwest of the country, however this is not well
+represented in the gauge measurements due to their sparsity in this region. More
+evident are the high precipitation amounts on the south-western coast of the
+country extending towards the Northwest, which manifest the South Atlantic
+Convergence Zone (SACZ, \citeauthor{satyamarty98}, \citeyear{satyamarty98}).
+Very low precipitation rates are observed in the Northeast, which is influenced
+by large scale subsistence patterns \citep{siqueira19}.
 
 \begin{figure}
   \centering
-  \includegraphics[width=1.0\textwidth]{../plots/gauges}
+  \includegraphics[width=0.9\textwidth]{figs/fig01}
   \caption{
-    Rain gauge data used in this study. Panel (a) displays the spatial
-    distribution of gauges by means of the number of gauges falling into
-    each hexagon. Hexagon-free areas are not covered by gauges. Panel (b)
-    shows the mean precipitation rate in each gauge.
+    Overview of the rain gauge data from December 2020 used to validate the
+    retrievals. Panel (a) displays their spatial distribution by means of the
+    number of gauges falling into each hexagon. Hexagon-free areas are not
+    covered by any gauges. Panel (b) shows the corresponding mean precipitation.
     }
   \label{fig:gauges}
 \end{figure}
@@ -170,78 +333,107 @@ are observed in the north east.
 
 \subsection{HYDRO}
 
-HYDRO is the currently operational real-time precipitation retrieval at the
+HYDRO is the currently operational near real-time precipitation retrieval at the
 Center for Weather Forecast and Climate Studies/National Institute for Space
-Research (CPTEC/INPE). It is based on the auto-estimator \citep{vicente98}, a
-semi-empirical retrieval technique using a power-law relationship between
-$10.8\ \unit{\mu m}$ IR brightness temperatures and correction factors taking
-into account moisture parameters and cloud structure. The current version of the
-retrieval is described in \citet{siqueira19}, which also introduces regional
-correction factors derived from a climatology of estimated surface precipitation
-from the radars of the Tropical Rainfall Measurement Mission (TRMM,
+Research (CPTEC/INPE). It is based on the Hydroestimator \citep{scofield03} and
+thus uses a combination of empirical power-law relationships between
+$10.7\ \unit{\mu m}$ IR brightness temperatures and surface precipitation with
+correction factors taking into account model-derived moisture and wind
+parameters as well as cloud structure. The current version of the retrieval is
+described in \citet{siqueira19}, which also introduces regional correction
+factors based on a climatology of surface precipitation rates derived from radar
+measurements of the Tropical Rainfall Measurement Mission (TRMM,
 \citeauthor{simpson96}, \citeyear{simpson96}) and GPM. For this study we use the
-corrected version of HYDRO proposed in \citet{siqueira19} with the regional
-corrections applied. As is was found to yield the most accurate results.
+corrected version of HYDRO proposed in \citet{siqueira19} with a regional
+correction for all of Brazil (referred to as HYDROBR in \citet{siqueira19}).
+
 
 \subsection{PERSIANN CSS}
 
-The PERSIANN Cloud Classification System (CCS, \citeauthor{hong04},
-\citeyear{hong04}) is another precipitation retrieval algorithm that uses IR
-observations from geostationary satellites to retrieve precipitation. It is
-included in this study as a reference dataset due to it being available globally
-at a 1-hour resolution. The algorithm is a fully empirical algorithm based on
-self-organizing maps, an early form of neural networks, that are used to
-classify cloud patches and associate them to power-law relationships, which are
-used to estimate the precipitation at each pixel. Although the global CCS
-dataset is currently being replaced by the updated PERSIANN Dynamic
-Infrared-Rain rate (PDIR-Now, \citeauthor{nguyen20}, \citeyear{nguyen20}) we
-decided not to use it due to the first half of the evaluation period missing
-from the online archive.
+PERSIANN CCS \citep{hong04} uses $10.7\ \unit{\mu m}$ IR observations from
+geostationary satellites to retrieve precipitation. Input images are first
+segmented using increasing temperature thresholds in order to identify pixels
+that correspond to convective activity. These pixels are consecutively assumed
+to be precipitating and classified using a neural network based algorithm.
+Quantitative precipitation estimates at pixel level are derived from this
+classification by applying a class-specific power law relationship that relates
+the $10.7\ \unit{\mu m}$ brightness temperatures to precipitation.
+
+The dataset that is used for the evaluation against Hydronn are hourly
+precipitation rates that are distributed in near real time through the PERSIANN
+data portal \citep{persiann_data}. Although the global CCS dataset is currently
+being replaced by the updated PERSIANN Dynamic Infrared-Rain rate (PDIR-Now,
+\citeauthor{nguyen20}, \citeyear{nguyen20}) we were not able to use it for this
+study due to the first third of the evaluation period missing from the online
+archive.
 
 
 \subsection{GPM IMERG}
 
-The Integrated Multi-satellite Retrievals for GPM (IMERG,
-\citeauthor{huffman15}, \citeyear{huffman15}) combines retrievals from PMW
-and IR observations as global rain gauge measurements to produce global,
-hourly measurements of precipitation. Due to its reliance on a wealth of
-measurement sources and the sophistication of the retrieval pipeline, the
-product can be considered one of the most accurate precipitation hourly
-precipitation products. 
+GPM IMERG \citep{huffman20} combines retrievals from passive microwave and IR
+observations as well as rain gauge measurements to produce global, half-hourly
+measurements of precipitation. Due to its reliance on a wealth of measurement
+sources as well as the sophistication of the retrieval pipeline, the product can
+be considered one of the most robust satellite-based precipitation products
+\citep{pradhan22}.
 
-\subsection{Hydronn}
+Three different configurations of IMERG products are available: IMERG-Early and
+IMERG-Late are based solely on satellite observations and available with
+latencies of 4 and 14 hours, respectively. IMERG-Final is adjusted using global
+gauge measurements but available first after 3.5 months. Although Hydronn has
+been designed to target near real-time applications and is thus more similar to
+IMERG-Early, we use IMERG-Final for our comparison as it constitutes the most
+elaborate precipitation estimates that are currently available and can thus be
+considered the state of the art of space-borne quantitative precipitation
+estimation.
 
-Hydronn is a neural network based real time precipitation retrieval algorithm
-that uses IR and VIS observation from the GOES-16 geostrationary satellite. It
-has been developed specifically to retrieve precipitation over Brazil.
+\section{Method}
 
-\subsubsection{Training data}
+This section describes the implementation of Hydronn, the proposed near
+real-time precipitation retrieval algorithm for Brazil. It is based on a
+convolutional neural network (CNN), which is used to predict the a posteriori
+distribution of instantaneous precipitation. Following this, it is discussed how
+the probabilistic precipitation estimates can be combined to hourly
+accumulations and an a priori adjustment is proposed to account for differences
+between the training data and the gauge measurements that are used to evaluate
+the retrieval.
 
-The training data for the Hydronn retrieval consists of co-locations of input
-observations from the GOES-16 ABI \citep{schmit18} and retrieved surface
+
+\subsection{Training data}
+
+The training data for the Hydronn retrieval is generated from co-locations of
+input observations from the GOES-16 ABI \citep{schmit18} and retrieved surface
 precipitation from the GPM combined product \citep{grecu16}. GOES ABI
 observations were extracted at their native resolutions and combined with the
-surface precipitation retrieved from the GPM combined product by mapping it to
-the $2\ \unit{km}$ resolution of the ABI's IR channels. Co-locations were
-extracted for the time span 2018-01-01 until 2021-09-01. Observations from the
-year 2020 were excluded from the training and are only used in the evaluation of
-the hydronn configurations.
+GPM combined surface precipitation by remapping them to the $2\ \unit{km}$
+resolution of the ABI's IR channels using a nearest-neighbor criterion.
+Co-locations were extracted for the time range 2018-01-01 until 2020-01-01 and
+2021-01-01 until 2021-09-01. Observations from the first, 11th and 21st day of
+every month of 2020 are used as test data set to establish the nominal
+performance of different retrieval configurations.
 
-The distribution of precipitation rates in the training dataset is displayed in
-Fig.~\ref{fig:training_data}. The detection threshold for precipitation of the
-GPM radar between $0.2$ and $0.4\ \unit{mm h^{-1}$ is clearly visible in the
-  distributions. In addition to this, there is a moderate seasonal cycle, which
-  mainly impacts the likelihood of moderate precipitation. The gauge
-  measurements exhibit a stronger effect of the seasonal cycle especially for
-  strong rain. Despite those differences, it cannot be concluded that the
-  training and gauge data are inconsistent, since the differences may be due to
-  the satellite measurements corresponding to instantaneous measurements,
-  whereas the gauge measurements are accumulated over the span of an hour.
+The results presented in \citet{pfreundschuh18} show the correspondence between
+the training data of neural network retrievals and the a priori distribution of
+explicitly Bayesian retrieval schemes. This perspective emphasizes the
+importance of training data distribution for the retrieval results and their
+interpretation. The distribution of precipitation rates in the training dataset
+is displayed in Fig.~\ref{fig:training_data}. The detection threshold for
+precipitation of the GPM radar between $0.2$ and $0.4\ \unit{mm \ h^{-1}}$ is
+clearly visible in the distributions. In addition to this, a weak seasonal cycle
+is apparent, which mainly impacts the likelihood of moderate precipitation. The
+gauge measurements exhibit a stronger effect of the seasonal cycle especially
+for strong rain. It should be noted here, however, that the precipitation
+estimates in the training data correspond to instantaneous precipitation
+estimates while the gauge measurements are integrated over the time of an hour.
+Differences between the seasonal cycles of the datasets may therefore be caused
+by changes in the temporal evolution of precipitation events. An approach to
+reconcile the differences between the distributions of training and validation
+will be proposed in Sec.~\ref{sec:correction} below.
 
 
 \begin{figure}
   \centering
-  \includegraphics[width=1.0\textwidth]{../plots/training_data_statistics}
+  \includegraphics[width=1.0\textwidth]{figs/fig02}
   \caption{
     Distribution of reference precipitation rates. Panel (a) shows the
     seasonal PDFs of precipitation rates in the training data. Panel (b)
@@ -254,251 +446,951 @@ GPM radar between $0.2$ and $0.4\ \unit{mm h^{-1}$ is clearly visible in the
 \end{figure}
 
 
-\subsubsection{Retrieval configurations}
+\subsection{Retrieval configurations}
 
 The Hydronn retrieval has been implemented in three different configurations in
-order to assess how the choice of input observations and retrieval resolution
-affects the retrieval. The most basic retrieval configuration is the
-\hydronnfourir retrieval, which only uses the $10.7\ \unit{\mu\ m}$ channel.
-This configuration has the advantage of using only a single infrared channel,
-that is available from all currently operational geostationary
-satellites and most historical sensors. The reliance on IR observations alone has
-furthermore the advantage the information content of the input observation is
-independent of the availability of sunlight. Because of it's sensitivity to cloud
-top height this channel has a long history of being used in precipitation retrievals
-and is also the sole channel used by the HYDRO and PERSIANN CCS algorithms.
+order to assess how the choice of input observations and output resolution
+affects its performance. The most basic retrieval configuration is the
+\hydronnfourir{} retrieval, which only uses brightness temperatures from the
+GOES 16 $10.3\ \unit{\mu m}$ channel as input. Due to their sensitivity to cloud
+top temperatures, longwave IR window channels are also used by HYDRO as well as
+the PERSIANN CCS retrieval. The availability of similar channels on a long range
+historical geostationary sensors makes them suitable for the generation of
+climate data records. The reliance on a single thermal IR channel has the
+additional advantage that the information content of the retrieval input is
+independent of the availability of sunlight and thus constant throughout the
+day. The second retrieval configuration, denoted as \hydronnfourall{}, uses all
+available GOES channels at a resolution of $4\ \unit{km}$. It uses the same
+neural network model as the \hydronnfourir{} configuration adapted to the larger
+number of input channels. The third configuration, \hydronntwo{}, aims to
+exploit the full potential of GOES observations for precipitation retrievals.
+The input includes observations from all GOES channels at their native
+resolution and precipitation is retrieved at a resolution of $2\ \unit{km}$ at
+nadir. The characteristics of the three configurations are summarized in
+Tab.~\ref{tab:configurations}.
 
-The next configuration named \hydronnfourall uses all available GOES channels at
-a resolution of $4\ \unit{km}$ at zenith. Except for relying  more satellite
-observations as input data, this configuration  is identical to the \hydronnfourir
-configuration.
+\begin{table}[hbpt!]
+  \centering
+  \caption{Hydronn retrieval configurations}
+  \label{tab:configurations}
+  \begin{tabular}{l|rrr}
+  Name & Input bands & Input resolution & Output resolution \\
+  \hline
+  \hydronnfourir{} & $13$ & $4\ \unit{km}$ & $4 \ \unit{km}$ \\
+  \hydronnfourall{} & $1, \ldots, 16$ & $4\ \unit{km}$ & $4 \ \unit{km}$ \\
+  \hydronntwo{} & 1, \ldots, 16 & $0.5, 1$ and $2 \unit{km}$ & $2 \ \unit{km}$
+  \end{tabular}
+\end{table}
 
-The final configuration aims to exploit the full potential of GOES observations
-for precipitation retrievals. The input includes observations from all GOES
-channels at their native resolution while precipitation is retrieved at a
-resolution of $2\ \unit{km}$ at zenith. Since 
 
-\subsubsection{Neural network model}
+\subsection{Neural network model}
 
-All Hydronn retrievals are based on a common convolutional neural network
-(CNN) architecture. An illustration of the architecture is provided in
-Fig.~\ref{fig:architecture}. 
+All Hydronn retrievals are based on a common convolutional neural network (CNN)
+architecture, which is illustrated in Fig.~\ref{fig:architecture}. A preliminary
+study found CNNs to yield significantly more accurate results than
+fully-connected neural networks that use only a single pixel as input
+\citep{ingemarsson21}. The fully-convolutional networks are constructed using
+what we refer to as Xception blocks, which are based on the Xception
+architecture proposed by \citet{chollet17}. These blocks are combined in an
+asymmetric encoder-decoder structure with 5 stages. Each downsampling stage
+consists of one downsampling Xception block followed by $N=4$ standard Xception
+blocks.
 
-The posterior distribution of the retrieval is estimated by approximating the
-PDF of the posterior distribution. Following \citet{metnet}, this is achieved by
-discretizing the range of expected precipitation values and predicting for each
-bin the probability of the observed precipitation falling it. This is
-conveniently implemented by treating the retrieval as a classification problem
-and using a cross-entropy loss to train the networks. During inference, the logits
+Since the \hydronntwo{} retrieval ingests observations at their native
+resolution, this architecture contains two additional downsampling blocks that
+are omitted for the \hydronnfourir{} and \hydronnfourall{} retrievals. The
+number of internal features for all architectures was set to $n_f = 128$, which
+is probably low compared to other neural network architectures. This was mostly
+motivated by hardware limitations. Since it was found to be sufficient to
+achieve good retrieval performance, we did not investigate the impact of this
+decision further.
+
+\begin{figure}[hbpt!]
+  \centering
+  \includegraphics[width=0.8\textwidth]{figs/fig03}
+  \caption{
+    The neural network architecture used by the \hydronntwo{} retrieval.
+  }
+  \label{fig:architecture}
+\end{figure}
+
+\subsection{Probabilistic precipitation estimates} 
+
+A defining characteristic of Hydronn is that precipitation is retrieved using a
+Bayesian framework. This means that, instead of predicting a single precipitation
+value, it provides an estimate of the full a posteriori distribution of the
+Bayesian retrieval problem. Although \citet{pfreundschuh18} proposed to use
+quantile regression neural networks (QRNNs) to perform Bayesian remote sensing
+retrievals with neural networks, a different approach is taken here. Following
+the work by \citet{sonderby20}, the range of precipitation values is discretized
+and the probability of the observed precipitation falling into each bin is
+predicted. By normalizing the predicted probabilities, a binned approximation of
+the probability density function (PDF) of the Bayesian a posterior distribution
+can be obtained. We found this approach to be equivalent to QRNNs in retrieval
+accuracy. However, calculating the distribution of the sum of two temporally
+independent predictions is easier on the binned PDF than on the predicted
+quantiles, which why the former approach was chosen for the implementation of
+Hydronn.
+
+This approach, which we refer to for simplicity as density regression neural
+network (DRNN), can be easily implemented by treating the retrieval as a
+classification problem over a discretized range of precipitation values and
+using a cross-entropy loss to train the network. During inference, the logits
 predicted by the network are transformed into a probability density by applying
 a softmax activation and normalizing the bin probabilities.
 
-\subsubsection{Retrieval output}
+Hydronn predicts the a posteriori distribution over 128 logarithmically spaced
+bins covering the range from $10^{-3}$ to $10^3\ \unit{mm\ h^{-1}}$. The
+reference precipitation of pixels without rain was set to a log-uniform random
+value between $10^{-3}$ and $10^{-2}\ \unit{mm\ h^{-1}}$. While not strictly
+necessary for our approach, this has the advantage of breaking the degeneracy of
+low quantiles of the posterior distribution, which makes it easier to verify the
+calibration of the probabilistic predictions on the validation data.
 
-For each retrieved pixel, the predicted posterior distribution is used to derive
-the posterior mean, a sample of the posterior distribution and 14 quantiles of
-the posterior distribution. The 14 quantiles are retained as a more compact
-representation of the posterior distribution than the probabilities over the 128
-bins that are produced by the networks. In addition to providing a direct
-measure of retrieval uncertainty, the retained quantiles can be used to infer
-e.g. probabilities of the instantaneous rain rates exceeding certain thresholds.
+Since storing the full posterior distribution for all pixels is of little use
+for operational processing, only a reduced number of relevant statistics are
+retained in the retrieval output. Those are the posterior mean as well as a
+sample and 14 quantiles of the posterior distribution. In addition to providing
+a direct measure of retrieval uncertainty, the quantiles can be used to
+reconstruct a piece-wise linear approximation of the posterior cumulative
+distribution function (CDF). The predicted posterior CDF can then be used, for
+example, to detect the exceedance of certain precipitation thresholds. Compared
+to training a separate classifier to perform this task, this approach has the
+advantage that the precipitation threshold can be chosen during inference.
 
-\subsubsection{Calculating precipitation accumulations}
+\subsection{Calculation of hourly accumulations}
+\label{sec:accumulation}
 
-The precipitation distributions prediced by hydronn are instantaneous
-precipitaiton rates. Since GOES 16 imagery is available every 10 minutes. This
-raises the question how to integrate these distributions to hourly precipitation
-rates. The difficulty with this is that it is unclear how the retrieval
-uncertainties should be propagated in time. For this study, we have implemented
-two heuristics for doing this that represent different assumptions on the
-temporal correlation of the errors in the precipitation retrieval.
+The precipitation estimates produced by Hydronn correspond to instantaneous
+precipitaiton rates. Since GOES 16 imagery is available every 10 minutes, a
+method is required to accumulate the posterior distributions of the
+instantaneous precipitation rates to hourly accumulations, which can then be
+compared to the gauge measurements. While this is not an issue when only the
+posterior mean is predicted, it is unclear how the retrieval uncertainties
+should be aggregated in time. In lack of a formal way to resolve this, we have
+implemented two heuristics for calculating probabilistic estimates of hourly
+accumulations from instantaneous measurements.
 
-The first approach is to average the predicted posterior distributions. For the
-case of multiple identical observations, this approach would conserve the
-retrieval uncertainties and may thus be viewed to correspond to a assuming a
-strong dependence between the retrieval errors for consecutive observations.
+The first heuristic is to simply average the predicted posterior distributions.
+For the case of multiple identical observations, this preserves the retrieval
+uncertainties and thus corresponds to the assumption of strong dependence of the
+retrieval errors for consecutive observations. The second approach is to assume
+temporal independence of the retrieval uncertainty. For identical, consecutive
+observations this will generally cause the retrieval uncertainty to decay. Given
+the binned probability densities of two independent random variables, the PDF of
+their sum can be approximated by calculating weighted histograms of the outer
+sum of the bin centroids weighted by the product of the bin probabilities.
 
-The second approach is to assume independence of the retrieval uncertainty. For
-identical, consecutive observations this will cause the retrieval uncertainty to
-decay. Given the binned probability densities of two independent random
-variables, the PDF of their sum can be approximated by calculating weighted
-histograms of the outer sum of the bin centroids weighted by the product of the
-bin probabilities.
+For the evaluation of the Hydronn retrieval, we calculate PDFs of hourly
+accumulations using both approaches. Two types of accumulations are produced for
+each Hydronn configuration: One corresponding to the assumption of dependent
+retrieval errors, which will be identified with the qualifier '(dep.)', as well as
+one corresponding to the assumption of independent retrieval errors, which will
+be identified with the qualifier '(indep.)'. Since the assumptions only affect
+the predicted retrieval uncertainties and not the predicted mean values, such a
+distinction is not required when point estimates of precipitation are
+considered.
 
-For the evaluation of the Hydronn retrieval we calculate hourly accumulations
-the PDFs for hourly accumulations using both approaches. We then calculate the
-retrieval outputs described above. For each retrieval configuration two types of
-hourly accumulations are produced. One corresponding to assuming dependent
-retrieval error, which will we mark with '(dep.)' where necessary. And one
-corresponding to assuming independent retrieval errors, which we will mark with
-'(indep.)'. It should be noted, however, that this only affects the predicted
-retrieval uncertainties and not the predicted mean values.
+\subsection{Correcting for a priori data}
+\label{sec:correction}
 
+According to Bayes theorem, the posterior distribution of  retrieved
+precipitation $p(x|\mathbf{y})$ for  given input observations $\mathbf{y}$ is
+proportional to the product of the probability of observing $\mathbf{y}$ for a
+given precipitation rate $x$ and the a priori probability of $x$:
+\begin{align}
+  p(x|\mathbf{y}) \propto p(\mathbf{y}|x) p(x)
+\end{align}
+ One difficulty with machine learning based retrievals is that the a priori
+ distribution cannot be chosen freely but is dictated by the training data
+ distribution. Fig.~\ref{fig:training_data} indicates that there are
+ inconsistencies between the training data and gauge measurements. For example,
+ the retrieval will learn from the training data that the probability of
+ precipitation values between $10^{-1}$ and $10^{-2}\ \unit{mm\ h^{-1}}$ is
+ effectively zero.
 
-\begin{figure}
+This raises the question whether it is possible to correct for the effect of the
+a priori assumptions encoded in the training data of the retrieval. To explore
+this, we propose the following method to correct the probabilistic predictions.
+Let $p_\text{Gauges}(x)$ denote the PDF of precipitation as measured by the
+available gauges shown in Fig~\ref{fig:training_data} (b). Moreover let
+\begin{align}
+  r(x) &= \frac{p_\text{Gauges}(x)}{p(x)}
+ \end{align}
+denote the ratio of the PDFs of the gauge a priori distribution and the a priori
+distribution of precipitation as defined by the training data. Assuming that
+$p_\text{Gauges}(x) = 0$ wherever $p(x) = 0$ and that the conditional
+distribution $p(\mathbf{y}|x)$ of the observations remains unchanged, a
+corrected posterior distribution can be obtained by point-wise multiplying the
+likelihood ratio $r$ with the posterior distribution predicted by Hydronn:
+\begin{align}
+  p_\text{Corrected}(x|y) \propto p(y|x) r(x) p(x),
+\end{align}
+
+The a priori distribution of retrieved hourly accumulations is not necessarily
+the distribution of instantaneous rain rates displayed in
+Fig.~\ref{fig:training_data}, but depends on how these accumulations are
+calculated. This leads to a different a priori distributions for each of the two
+methods used to accumulate the precipitation (see Sec.~\ref{sec:accumulation}).
+For the assumptions of temporally dependent retrieval uncertainties, the a
+priori is identical to that of the instantaneous rain rates. For the assumption
+of temporally independent retrieval uncertainties, however, the a priori
+corresponds to the distribution of the mean of 6 consecutive draws from this
+distribution.
+
+An issue that we encountered here is the limited numerical resolution of the
+gauge measurements of $0.2\ \unit{mm\ h^{-1}}$, which causes problems when the
+calibration of probabilistic predictions is evaluated against the gauge
+measurements. To counteract this, we have added numerical noise to the gauge
+measurements: Uniform random values from the range $[-0.1 , 0.1]$ are added to
+all non-zero measurements, while zero values are replaced by log-randomly
+distributed values from the range $[10^{-3}, 5 \cdot 10^{-3}]$. This slightly
+increases the mean of the precipitation by about $2\ \unit{\%}$, but this is
+likely negligible compared to other uncertainties that affect precipitation
+retrievals.
+
+\begin{figure}[hbpt!]
   \centering
-  \includegraphics[width=0.8\textwidth]{../plots/correction_factors}
+  \includegraphics[width=0.8\textwidth]{figs/fig04}
   \caption{
-    A priori correction factors.
-    }
+    A priori distributions of hourly accumulations and derived correction
+    factors $r$. Panel (a) displays the a priori distributions of hourly
+    precipitation accumulations derived assuming strong temporal dependence of
+    measurements (green) and complete independence (blue). The gray, dashed line
+    shows the PDF of the gauge measurements. Panel (b) displays the
+    corresponding correction factors for the two assumptions calculated as the
+    ratio between the respective PDFs and the PDF of the gauge measurements.
+  }
   \label{fig:correction_factors}
 \end{figure}
 
+The a priori distributions and corresponding derived correction factors are
+displayed in Fig.~\ref{fig:correction_factors}. It is apparent that the
+assumptions of temporally dependent uncertainties yields better agreement with
+the gauge data than the assumption of temporally independent uncertainties. The
+resulting correction factors are thus closer to the $y=1$ line for the
+dependence assumption. We found that it was necessary to truncate the correction
+factors corresponding to the independence assumption at $r=10^3$ because larger
+values would amplify numerical noise leading to the rare occurrence of
+unrealistically high precipitation values, which would distort the retrieval
+results.
+
+
 \section{Results}
 
-\subsection{Model evaluation}
+This section presents the evaluation of the Hydronn retrievals, which is split
+into three parts. The first part analyzes the nominal performance of the three
+Hydronn configurations on the held-out test data. The second part compares the
+retrieved hourly accumulations to the gauge measurements and the reference
+precipitation algorithms. Finally, the third part presents a case study of
+a heavy precipitation event that occurred during the validation period.
 
-\begin{figure}
-  \centering
-  \includegraphics[width=1.0\textwidth]{../plots/evaluation_scatter}
-  \caption{
-    Scatter plots of retrieved mean precipitation against true precipitation
-    for all retrieval configurations.
-    }
+\subsection{Evaluation of Hydronn configurations}
+
+To obtain an unperturbed assessment of the relative performances of the three
+Hydronn configurations, we evaluate the performance on the test data, which was
+derived from the same source (albeit during a different time period) and is
+therefore guaranteed to have similar statistics as the training data. Fig.
+\ref{fig:evaluation_scatter} displays PDFs of retrieved precipitation
+conditioned on the value of the reference precipitation. Due to the limited
+information content of the VIS/IR observations there are significant
+uncertainties in all results. These lead to significant wet biases for lightly
+raining pixels and dry biases for strong precipitation.
+
+Nonetheless, slight improvements between the three Hydronn configurations are
+discernible. While the \hydronnfourir{} retrieval exhibits the weakest
+relationship between reference and retrieved precipitation, the \hydronnfourall{}
+configuration yields slightly more accurate results. This can be seen in the
+sharpening of the conditional PDFs for precipitation rates occurring between $2$
+and $20\ \unit{mm\ h^{-1}}$ as well as an increase in the slope of the
+conditional mean retrieved precipitation for rain rates exceeding
+$2\ \unit{mm\ h^{-1}}$. Clearer improvements in retrieval accuracy are observed
+for the \hydronntwo{} configuration, which yields a slightly sharper 
+distribution and an increased slope in the conditional mean of the retrieved
+precipitation for precipitation rates larger than $0.5\ \unit{mm\ h^{-1}}$.
+
+\begin{figure}[hbpt]
+  \centering \includegraphics[width=1.0\textwidth]{figs/fig05}
+  \caption{PDFs of retrieved precipitation conditioned on the reference
+    precipitation. The purple line shows the mean retrieved precipitation
+    conditioned on the value of the reference precipitation.}
   \label{fig:evaluation_scatter}
 \end{figure}
 
+For a more quantitative analysis, Tab.~\ref{tab:evaluation_metrics} summarizes
+the retrieval performance using a range of accuracy metrics. The metrics
+considered here are the bias, mean absolute error (MAE), mean squared error (MSE),
+the mean of the continuous ranked probability score (MCRPS) and the correlation
+coefficient. Given a predicted cumulative distribution function $F$ and a
+reference value $x$, the continuous ranked probability score (CRPS) is defined
+as
+\begin{align}
+  \text{CRPS}(F, x) = \int_{-\infty}^\infty (F(x') - \mathrm{I}_{x' > x})^2\ dx',
+\end{align}
+where $\mathrm{I}_{x' > x}$ is the indicator function taking the value $1$ where
+$x' > x$ and $0$ otherwise.
+
+The 14 quantiles that are produced as retrieval output are used to calculate the
+CRPS instead of the full predicted PDF, which ensures that the evaluation is
+representative of the actual retrieval output. In contrast to the other metrics
+considered in Tab.~\ref{tab:evaluation_metrics}, the CRPS takes into account not
+only the accuracy of the predicted posterior mean but both sharpness and
+calibration of the probabilistic precipitation estimates \citep{gneiting07}.
+
+Overall, the results from Tab.~\ref{tab:evaluation_metrics} confirm the
+tendencies observed in Fig~\ref{fig:evaluation_scatter}. The retrieval accuracy
+increases as the information content in the input observations is increased. In
+absolute terms, the largest improvements are achieved when the inputs are
+extended from a single channel to all channels of the ABI. However, further
+improvements can be achieved by ingesting all observations at their native
+resolutions and retrieving precipitation at $2\ \unit{km}$ resolution. It should
+be noted that the test dataset contains observations from all times of the day,
+so these improvements are not constrained by the availability of daylight.
 
 \begin{table}
-  \caption{Error metrics on test dataset. Each row displays a selection of error
-     metrics for the different retrieval Hydronn configurations.}
+  \caption{Accuracy metrics for the three Hydronn configurations evaluated on
+    test data. The value corresponding to the highest accuracy in each column
+  is marked using bold font.}
   \label{tab:evaluation_metrics}
-\begin{tabular}{l|rrrr}
-  Algorithm & Bias [$\unit{mm\ h^{-1}}$] & MAE [$\unit{mm\ h^{-1}}$] & MSE [$\unit{(mm\ h^{-1})^{2}}$]& CRPS [$\ $] \\
-  \hline
-  \hydronnfourall & 0.0006 & 0.1626 & 1.1848 & 0.0865 \\
-  \hydronntwo & -0.0001 & 0.1508 & 1.0827 & 0.0757 \\
- \end{tabular} 
-\end{table}
- 
 
+\begin{tabular}{l|rrrrr}
+  Algorithm & Bias [$\unit{mm\ h^{-1}}$] & MAE [$\unit{mm\ h^{-1}}$] & MSE [$\unit{(mm\ h^{-1})^{2}}$]& CRPS & Correlation  \\
+  \hline
+  \hydronnfourir{} & 0.0009 & 0.1988 & 1.3356 & 0.1807 & 0.4343 \\
+  \hydronnfourall{} & 0.0006 & 0.1626 & 1.1848 & 0.0865 & 0.5296 \\
+  \hydronntwo{} & \bf{-0.0001} & \bf{0.1508} & \bf{1.0827} & \bf{0.0757} & \bf{0.5844} \\
+\end{tabular} 
+\end{table}
 
 
 \subsection{Validation against rain gauge data}
 
-\subsubsection{Mean precipitation}
-\begin{figure}
+In contrast to Hydronn, all of the reference algorithms considered here neglect
+the probabilistic nature of the retrieval and provide only a single
+precipitation estimate. The evaluation of Hydronn against the reference
+algorithms is therefore performed in two steps. Firstly, the accuracy of the
+deterministic quantitative precipitation estimates is evaluated against the
+gauge measurements. Secondly,  the probabilistic estimates produced by
+Hydronn and their potential to improve the characterization of the
+observed precipitation are assessed.
+
+\subsubsection{Quantitative precipitation estimates}
+
+Accuracy metrics of all retrievals evaluated against the gauge measurements for
+hourly, daily and monthly precipitation means are provided in
+Tab.~\ref{tab:metrics}. In terms of correlations for hourly means, HYDRO yields
+the worst performance with a correlation of 0.134, followed by PERSIANN CCS with
+a correlation of 0.26. IMERG and \hydronnfourir{} achieve similar accuracy for
+hourly estimates with a correlation around 0.4. The \hydronnfourall{} and
+\hydronntwo{} retrievals further improve the accuracy with correlations of 0.5
+and 0.545, respectively. As the integration time increases, the accuracy of all
+retrievals improves. For daily means, the ranking of the retrieval algorithms
+remains the same as for hourly means. This is also the case for monthly means
+with the exception that the accuracy of IMERG increases to the level of the best
+Hydronn configuration. A likely explanation for this is the calibration that is
+applied to the IMERG Final product, which matches it to monthly gauge
+measurements. 
+
+\begin{table}[hbpt!]
+  \caption{Accuracy metrics for the retrieved mean precipitation compared to gauge measurements
+    at different time scales. The best values in each column are marked using bold font.}
+  \label{tab:metrics}
+  \begin{tabular}{l|r|rrr|rrr|rrr}
+        & &
+        \multicolumn{3}{c|}{MAE [$\unit{mm\ h^{-1}}$]} &
+        \multicolumn{3}{c|}{MSE [$(\unit{mm\ h^{-1}})^2$]} &
+        \multicolumn{3}{c}{Correlation} \\
+        \multicolumn{1}{c|}{Retrieval} &
+        \multicolumn{1}{c|}{Bias [$\unit{mm\ h^{-1}}$]} &
+        Hourly & Daily & Monthly &
+        Hourly & Daily & Monthly &
+        Hourly & Daily & Monthly \\
+        \hline
+        HYDRO & -0.030 &
+        0.308 & 0.208  & 0.104 &
+        2.964 & 0.212  & 0.019 &
+        0.134 & 0.421 & 0.629 \\
+        %
+        PERSIANN CCS & 0.088 &
+        0.382 & 0.274 & 0.144 &
+        3.417 & 0.293 & 0.04 &        
+        0.26  & 0.415 & 0.55 \\
+        %
+        IMERG & 0.015 &
+        0.282 & 0.191 & 0.077 &
+        2.262 & 0.178 & $\mathbf{0.013}$ &
+        0.389 & 0.574 & 0.741 \\
+
+
+        \hydronnfourir{} & -0.023 &
+        0.277 & 0.191 & 0.096 &       
+        2.091 &  0.163 &  0.017 &
+        0.412 & 0.573 & 0.650 \\
+
+        \hydronnfourall{} & $\mathbf{0.002}$ &
+        0.247 & 0.168 & 0.081 &
+        1.874 & 0.135 & 0.014 &
+        0.502 & 0.662 & 0.731 \\
+
+        \hydronntwo{}   &  0.011 &
+        $\mathbf{0.239}$ & $\mathbf{0.162}$ & $\mathbf{0.075}$ &
+        $\mathbf{1.760}$ & $\mathbf{0.128}$ & $\mathbf{0.013}$ &
+        $\mathbf{0.545}$ & $\mathbf{0.685}$ & $\mathbf{0.756}$ \\
+  \end{tabular}
+\end{table}
+
+A graphical analysis of the accuracy of the retrieved daily accumulations is
+provided in Fig~\ref{fig:daily_accumulations}. In this representation the large
+uncertainties that are present in all retrievals are evident. Nonetheless, the
+results confirm the general findings from the analysis above. The two
+conventional VIS/IR retrievals, HYDRO and PERSIAN CCS, yield the least accurate
+results. In particular, both retrievals show a tendency to miss or strongly
+underestimate accumulations below $50\ \unit{mm\ d^{-1}}$. This tendency is
+decreased in the IMERG results for accumulations $> 10\ \unit{mm\ h^{-1}}$ but
+still evident for weaker precipitation. Overall, the Hydronn retrievals achieve
+higher accuracy for both low and high precipitations, which increases with the
+information content of the input. Nonetheless, systematic underestimation of
+strong rain rates affects all Hydronn retrievals.
+
+\begin{figure}[hbpt!]
   \centering
-  \includegraphics[width=1.0\textwidth]{../plots/mean_precipitation}
+  \includegraphics[width=1.0\textwidth]{figs/fig06}
   \caption{
-    Mean precipitation during December 2020. Each panel shows for all evaluated
-    precipitation retrieval the mean precipitation in the background overlaid
-    with the symmetric percentage biases with respect to gauge measurements.
+    Scatter plots of retrieved daily accumulations against gauge measurements
+    for the reference retrievals and the three Hydronn configurations.
+    Frequencies have been normalized column-wise to improve the visibility of
+    high reference precipitation.
+  }
+  \label{fig:daily_accumulations}
+\end{figure}
+
+The spatial distribution of the biases of the monthly mean precipitation is
+displayed in Fig.~\ref{fig:mean_precipitation}. The strongest biases are
+observed in the PERSIANN CCS results, which strongly overestimate precipitation
+in central and northern Brazil. HYDRO and \hydronnfourir{}, as well as to a
+lesser extent PERSIANN CCS, \hydronnfourall{} and \hydronntwo{}, exhibit a
+systematic dry bias in southern Brazil. Overall, the biases of IMERG are
+smallest in magnitude and exhibit the least extent of spatial correlation.
+However, the differences between IMERG and the best Hydronn configuration,
+\hydronntwo{}, are small.
+
+\begin{figure}[hbpt!]
+  \centering
+  \includegraphics[width=1.0\textwidth]{figs/fig07}
+  \caption{
+    Mean precipitation during December 2020. Shading in the background of
+    each panel shows the spatial distribution of the mean precipitation
+    of the corresponding retrieval. Colored hexagons show the spatial
+    distributions of the retrieval biases with respect to the gauge
+    measurements.
     }
-  \label{fig:evaluation_scatter}
+  \label{fig:mean_precipitation}
 \end{figure}
 
 
+Finally, we consider the derived daily cycles of precipitation, which are
+displayed in Fig.~\ref{fig:daily_cycle}. From the reference retrievals, both
+IMERG and HYDRO yield relatively good agreement with the gauge measurements.
+IMERG is slightly closer to the gauge measurements during morning and early
+afternoon but overestimates precipitation in the afternoon and evening. HYDRO
+slightly underestimates precipitation during the first half of the day but its
+afternoon peak, despite being close in magnitude to that of the gauge
+measurements, is delayed by about three hours. PERSIANN CCS shows good agreement
+with the gauge measurements in the first half of the day but strongly
+overestimates the afternoon peak. All Hydronn configurations yield good
+agreement with gauge measurements. The \hydronntwo{} configurations slightly
+overestimates precipitation before 10 am, while \hydronnfourir{} underestimates
+the afternoon peak.
+
+\begin{figure}[hbpt]
+  \centering
+  \includegraphics[width=1.0\textwidth]{figs/fig08}
+  \caption{
+    Measured and retrieved daily cycles of precipitation. Panel (a) displays the
+    daily cycles retrieved by the three reference retrievals (solid lines) and
+    the gauge measurements (dashed line) for reference. Panel (b) displays the
+    corresponding diurnal cycles for the three Hydronn configurations (solid
+    lines).
+  }
+  \label{fig:daily_cycle}
+\end{figure}
+
+\subsubsection{Probabilistic estimates}
+
+We now proceed to evaluate the probabilistic precipitation estimates that are
+produced by Hydronn. As explained in Sec.~\ref{sec:accumulation}, two
+probabilistic estimates of the hourly precipitation rates were produced. The
+first one, (dep.), assumes strong dependence of retrieval errors for consecutive
+observations, while the second one, (indep.), assumes independent errors. In
+addition to that, for each of these predictions a corrected distribution has
+been calculated using the correction factors described in
+Sec.~\ref{sec:correction}. This yields four probabilistic predictions for each
+Hydronn configuration. These predictions will be referred to with the
+configuration name and the qualifiers (dep.), (dep., corr.) for the predictions
+derived assuming dependent uncertaintes with and without correction,
+respectively, and (indep.), (indep. corr) for the corresponding predictions
+derived using the independence assumption.
+
+We first consider the distribution of precipitation rates as measured by gauges
+and the retrieval algorithms, which is shown in
+Fig.~\ref{fig:rain_rate_distributions}. All reference retrievals overestimate
+the frequency of low and moderate rain rates while underestimating the frequency
+of high rain rates. For each Hydronn configuration, the distributions of the
+mean as well as a random sample from the retrieval posterior are displayed. The
+results for the three Hydronn configurations are almost identical to each other.
+The distribution of the posterior mean exhibits similar characteristics as the
+retrieved values of the reference retrievals. Although slightly closer to the
+distribution of gauge measurements, the uncorrected distribution of samples of
+the posterior distribution obtained assuming temporally independent errors still
+does not match the gauge distribution very well. This is improved by the a
+priori correction but an overestimation of moderate precipitation remains.
+Sampling from the posterior distributions corresponding to the assumption of
+temporally dependent uncertainties yields fairly good agreement with the
+distribution of gauge measurements. It is improved further by the a priori
+correction, which mostly improves the agreement at low and moderate rain rates.
+
+ The deviations between the distribution of retrieved posterior mean values and
+ the reference distribution can thus be understood as an effect of the
+ uncertainties in the retrieval results. These uncertainties lead to a lack of
+ very high precipitation values in the distribution of retrieved means of the
+ retrieval posterior. When instead of the mean samples from the posterior
+ distribution are considered, and the differences between the a priori and gauge
+ measurement distributions are taken into account, the extreme values of the
+ distribution are correctly reproduced.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{figs/fig09}
+  \caption{
+    Distributions of measured and retrieved rain rates. The dark grey, filled
+    curve in the background of each panel shows the PDF of the gauge
+    measurements. Colored lines drawn on top show the corresponding PDFs of the
+    retrieved precipitation. The distributions for the reference algorithms are
+    shown in Panel (a). Panel (b), (c) and (d) show the distribution of mean
+    values and random samples from the retrieval posterior.
+  }
+  \label{fig:rain_rate_distributions}
+\end{figure}
+
+In addition to sampling from the posterior distribution, the retrieved quantiles
+can be used to derive confidence intervals for the predicted precipitation.
+Their reliability is assessed in Fig.~\ref{fig:calibration}, which displays the
+calibration curves of the confidence intervals. While the assumption of
+dependent retrieval errors leads to an overestimation of the uncertainties,
+assuming independent errors leads to underestimation. However, for both
+assumptions this is corrected by the a priori correction, albeit some
+underestimation remains for the (indep.) results. The results presented in
+Fig.~\ref{fig:calibration} use the modified gauge measurements described in
+Sec.~\ref{sec:correction} to which small random noise has been added to non-zero
+measurements and zeros were replaced with small random values. This was required
+because quantiles are ill-defined when the CDF of a quantity is discontinuous.
+So while the results above show that the predicted uncertainties from the
+Hydronn retrieval are well calibrated, they would not be when compared against
+the raw gauge measurements. However, since the modifications to the measured
+precipitation are well within their uncertainty this  still demonstrates
+the meaningfulness of the predicted confidence intervals.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{figs/fig10}
+  \caption{
+    Calibration of the confidence intervals derived using the quantiles
+    of the retrieval posterior distribution predicted by each Hydronn
+    configuration. Grey, dashed line in the background shows the expected
+    results for perfectly calibrated results.
+    }
+  \label{fig:calibration}
+\end{figure}
+
+
+The retrieved quantiles can also be used derive probabilities of an observed
+pixel exceeding certain precipitation thresholds. This has been used to derive
+probabilities of the hourly precipitation exceeding $5$ and
+$20\ \unit{mm\ h^{-1}}$, which correspond roughly to the $99$ and
+$99.9\ \unit{\%}$ of the CDF of precipitation rates. The ability of the
+retrievals to detect high-impact precipitation events is assessed using
+precision-recall (PR) curves in Fig.~\ref{fig:pr_curves}. For the
+non-probabilistic retrievals the curves were generated using the predicted
+precipitation and classifying all pixel above a varying threshold as exceeding
+the sought-after precipitation rate. The corresponding curves for the Hydronn
+retrievals were obtained by varying the probability threshold above which a
+pixel is classified as an high-impact event.
+
+For the detection of events exceeding $5\ \unit{mm\ h^{-1}}$, HYDRO again
+exhibits the least skill, followed by PERSIANN CCS. Compared to these two, IMERG
+performs clearly better. The detection skill of \hydronnfourir{} is close to
+that of IMERG, while the two other configurations yield significantly better
+detection performance than IMERG. Interestingly, the assumption used to
+accumulate the uncertainties as well as the a priori correction do not have
+a significant effect on the detection skill. The reason for this is likely that
+the variation of the probability threshold for the generation of the PR curves
+has a calibrating effect on the retrieval results. For events exceeding $20\ \unit{mm\ h^{-1}}$,
+all retrievals yield worse detection accuracy. Also here HYDRO exhibits the
+least skill, followed by PERSIANN CCS and IMERG, which yield very similar
+results. All Hydronn configurations outperform the reference retrievals.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{figs/fig11}
+  \caption{
+    Precision-recall  curves for the detection of precipitation events with
+    precipitation rates larger than $5\ \unit{mm\ h^{-1}}$ (first row) and
+    $20\ \unit{mm\ h^{-1}}$ (second row). Columns show the results for the
+    reference retrievals as well as for each of the Hydronn configurations.
+    }
+  \label{fig:pr_curves}
+\end{figure}
+
+Since the Hydronn retrievals can be used to derive a probability of an
+observation exceeding a given precipitation threshold, a relevant question is
+how accurate these probabilities are. The calibration of the detection
+probabilities of events exceeding $5\ \unit{mm\ h^{-1}}$ is displayed in
+Fig.~\ref{fig:classification_calibration}. While the predictions derived
+assuming temporally dependent uncertainties are fairly well calibrated, larger
+deviations are observed for the probabilities derived assuming independent
+uncertainties. Moreover, while the correction marginally improves the
+calibration of the results for the dependent uncertainties, it degrades that of
+the probabilities derived assuming independent uncertainties. While the results
+are qualitatively similar across all Hydronn configurations, the detection
+probabilities increase in magnitude with the information content of the
+retrieval inputs, indicating that the sharpness of the probabilistic predictions
+increases. Nonetheless, even for an event with a threshold of only
+$5\ \unit{mm\ h^{-1}}$ probabilities do not exceed $60\ \unit{\%}$, which
+highlights the limitations of the VIS/IR based retrievals for the detection of
+extreme precipitation.
+
+\begin{figure}
+  \centering
+  \includegraphics[width=1.0\textwidth]{figs/fig12}
+  \caption{
+    Calibration of the probabilistic precipitation event detection. 
+    }
+  \label{fig:classification_calibration}
+\end{figure}
+
+In addition to the PR curves, we have calculated commonly used detection metrics
+for all retrievals in order to simplify the comparison to other studies. These
+metrics include the probability of detection (POD, the fraction of events that
+were correctly detected), the false alarm rate (FAR, the fraction of all
+detections that are wrong) and the critical success index (CSI) for the
+detection of events with more than $20\ \unit{mm \ h^{-1}}$. The results are
+displayed in Tab.~\ref{tab:detection}. For the calculation of POD and FAR for
+the reference retrievals, a retrieved precipitation rate exceeding
+$20\ \unit{mm\ h^{-1}}$ is counted as a detection. For the Hydronn retrievals
+the probability threshold has been tuned to yield a FAR close to that of IMERG.
+As was to be expected from the PR curves in Fig.~\ref{fig:pr_curves}, HYDRO
+exhibits the least detection skill and does not detect any of the actual
+occurrences of strong precipitation but still produces false positives. Compared
+to this, IMERG does significantly better but suffers from a very low POD.
+PERSIANN performs better than IMERG in terms of POD but also has a higher FAR.
+The Hydronn retrievals achieve higher POD at lower FAR for all configurations.
+The POD of extreme precipitation increases markedly as more channels and higher
+resolution are incorporated. Similar results are observed for the CSI.
 
 \begin{table}
-  \caption{Error metrics for evaluation against Gauge data.}
-  \label{tab:metrics}
-\begin{tabular}{|l||r|r|r|r|}
+  \caption{Error metrics for the detection of precipitation events with rain rates exceeding
+    $20\ \unit{mm\ h^{-1}}$.}
+  \label{tab:detection}
+\begin{tabular}{ll|rrrr}
+Retrieval     & &   POD &   FAR &   CSI\\
 \hline
-  Algorithm & Bias & MSE & Correlation & SMAPE \\
+PERSIANN CCS  & & 0.006 & 0.987 &  0.004 \\
+PERSIANN CCS  & & 0.039 & 0.926 &  0.026 \\
+HYDRO         & & 0.000 & 1.000 &  0.000 \\
+IMERG         & & 0.018 & 0.867 &  0.016 \\
 \hline
+\multirow{4}{*}{Hydronn$_{4, \text{IR}}$} & (dep.)          & 0.085 & 0.803 &  0.063 \\
+& (dep., corr.)   & 0.121 & 0.811 &  0.080 \\
+& (indep.)        & 0.079 & 0.806 &  0.059 \\
+& (indep., corr.) & 0.076 & 0.798 &  0.058 \\
 \hline
-
-PERSIANN CCS & 0.0694 & 3.9312 & 0.0915 & 1.7260 \\ 
+\multirow{4}{*}{Hydronn$_{4, \text{All}}$} &  (dep.)         & 0.109 & 0.800 &  0.076 \\
+&  (dep., corr.)  & 0.133 & 0.808 &  0.085 \\
+&  (indep.)       & 0.167 & 0.801 &  0.100 \\
+&  (indep., corr.)& 0.145 & 0.800 &  0.092 \\
 \hline
-IMERG & 0.0189 & 2.1737 & 0.3842 & 1.2665 \\ 
-\hline
-HYDRO & 0.1015 & 4.3813 & 0.1258 & 1.6735 \\ 
-\hline
-Hydronn$_{2, \text{all}}$ & 0.0128 & 1.6814 & 0.5442 & 1.0159 \\ 
-\hline
-Hydronn$_{2, \text{all}}$ dep. (corr.) & -0.0236 & 1.7869 & 0.5152 & 1.0135 \\ 
-\hline
-Hydronn$_{2, \text{all}}$ indep. (corr.) & 0.0402 & 1.7049 & 0.5448 & 1.0254 \\ 
-\hline
-Hydronn$_{4, \text{all}}$ & -0.0522 & 1.9128 & 0.4622 & 1.1127 \\ 
-\hline
-Hydronn$_{4, \text{all}}$ dep. (corr.) & -0.0459 & 1.9175 & 0.4573 & 1.0979 \\ 
-\hline
-Hydronn$_{4, \text{all}}$ indep. (corr.) & 0.0210 & 1.9417 & 0.4537 & 1.1927 \\ 
-\hline
+\multirow{4}{*}{Hydronn$_{2, \text{All}}$} &  (dep.)         & 0.242 & 0.799 &  0.123 \\
+&  (dep., corr.)  & 0.270 & 0.804 &  0.128 \\
+&  (indep.)       & 0.267 & 0.799 &  0.129 \\
+&  (indep., corr.)& 0.242 & 0.801 &  0.123 \\
 \end{tabular}
 \end{table}
 
-\begin{figure}
-  \centering
-  \includegraphics[width=1.0\textwidth]{../plots/rain_rate_distributions}
-  \caption{
-    Distributions of retrieved rain rates.
-    }
-  \label{fig:evaluation_scatter}
-\end{figure}
-
-\subsection{Uncertainty estimates}
-
-\begin{figure}
-  \centering
-  \includegraphics[width=1.0\textwidth]{../plots/validation_calibration}
-  \caption{
-    Calibration of confidence intervals for retrieved precipitation.
-    }
-  \label{fig:evaluation_scatter}
-\end{figure}
-
-\subsection{Detection of high-impact events}
-
-\begin{figure}
-  \centering
-  \includegraphics[width=1.0\textwidth]{../plots/validation_roc}
-  \caption{
-    Receiver operating characteristic (ROC) curves for the detection of precipitation
-    events with a precipitation rate larger than $10\ \unit{mm\ h^{-1}}$.
-    }
-  \label{fig:evaluation_scatter}
-\end{figure}
-
-\begin{figure}
-  \centering
-  \includegraphics[width=1.0\textwidth]{../plots/validation_classification_calibration}
-  \caption{
-    Calibration of the probabilistic precipitation event classification. 
-    }
-  \label{fig:evaluation_scatter}
-\end{figure}
 
 \subsection{Case study}
 
+As final part of this evaluation, a case of heavy precipitation in the city of
+Duque de Caxias in the State of Rio de Janeiro is considered, which occurred
+between the 22nd and 24th of December 2020 and lead to floodings
+\citep{flooding}. About $250\ \unit{mm}$ of accumulated precipitation were
+measured by the rain gauge in Xer\'em over the period of two days. An overview
+of the spatial distribution of retrieved accumulated precipitation over the two
+days is provided in Fig.~\ref{fig:accumulations_case}. Fairly good agreement is
+observed between IMERG and the \hydronnfourall{} and \hydronntwo{}
+configurations. \hydronnfourir{} yields accumulations of slightly lower
+magnitude and is spatially less well defined than the two other Hydronn
+retrievals. The accumulations from PERSIANN CCS are lowest in terms of
+magnitude, whereas those from HYDRO are highest. However, neither of the two
+agrees well with the spatial distribution retrieved by IMERG or the Hydronn
+retrievals. Both PERSIANN CCS and HYDRO exhibit systematic dry biases in the
+region around Duque de Caxias compared to the gauge measurements, which is
+present to a lesser degree also in the results of \hydronnfourir{}. This
+dry bias is less pronounced in the results of IMERG, \hydronnfourall{} and
+\hydronntwo{}.
 
-\begin{figure}
+\begin{figure}[!hbpt]
   \centering
-  \includegraphics[width=1.0\textwidth]{../plots/case_study}
+  \includegraphics[width=1.0\textwidth]{figs/fig13}
   \caption{
-    Retrieved precipitation for an extreme precipitation event near SP.
-    }
-  \label{fig:evaluation_scatter}
+    Retrieved precipitation for an extreme precipitation event in the city of
+    Duque de Caxias in the state of Rio de Janeiro. Shading in background shows
+    the accumulated precipitation between 2020-12-22 00:00 to 2020-12-24 00:00.
+    Colored markers show the relative bias of the retrieved accumulated
+    precipitation compared to gauges. The green star marks the location of
+    Xer\'em, where flooding occurred.
+  }
+  \label{fig:accumulations_case}
 \end{figure}
 
-\subsection{Daily cycle}
+The rain rates at the gauge station in Xer\'em (location marked by green star in
+Fig.~\ref{fig:accumulations_case}) are displayed in
+Fig.~\ref{fig:precipitation_case}. The plots show the hourly precipitation rates
+retrieved by the reference retrievals as well as the mean and posterior
+distribution for all Hydronn retrievals. Only results obtained with the
+assumption of dependent retrieval uncertainties and the a priori correction
+applied are shown. The precipitation measured at the rain gauge far exceeds the
+precipitation measured by any of the reference retrievals or the retrieved mean
+of the Hydronn retrievals. The Hydronn retrievals predict elevated uncertainties
+for the period during which the strongest precipitation is observed. However,  the
+precipitation peaks still exceed the 99th percentile. Two factors may explain
+that more than the expected $1\ \unit{\%}$ of gauge measurements lie outside the
+predicted uncertainty range. Firstly, the observations considered here are not
+randomly sampled but correspond to an event that is known to be extreme.
+Secondly, as stated in the article in \citet{flooding}, heavy precipitation
+events are common in this region. This may indicate that  regional factors
+may act to intensify the precipitation, which is unlikely to be captured in the
+training data of the retrieval.
 
+Nonetheless, an encouraging results is that the predicted value of the 99th
+percentile increases with the information content in the retrieval input. This
+indicates that the neural network can leverages the additional information to
+produce sharper uncertainty estimates.
 
-\begin{figure}
+\begin{figure}[!hbpt]
   \centering
-  \includegraphics[width=1.0\textwidth]{../plots/daily_cycle}
+  \includegraphics[width=1.0\textwidth]{figs/fig14}
   \caption{
-    Retrieved daily cycle of precipitation.
+    Retrieved precipitation for an extreme precipitation even that occurred between
+    2020-12-22 and 2020-12-24 in the cite of Duque de Caxias in the
+    state of Rio de Janeiro. Grey, dashed lines show the precipitation by the
+    gauge station in Xer\'em. Solid lines show the retrieved mean precipitation
+    for each retrieval algorithm. The shading shows filled contours of the
+    posterior CDF at values $[0.01, 0.1, 0.2, \ldots, 0.8, 0.9, 0.99]$.
     }
-  \label{fig:evaluation_scatter}
+  \label{fig:precipitation_case}
 \end{figure}
+
+\section{Discussion}
+
+The study presented Hydronn, a neural-network-based precipitation retrieval for
+Brazil, which has been trained using combined radar and radiometer measurements
+from the GPM Core Observatory satellite. The retrieval compares favorably
+against the currently operational precipitation retrieval, HYDRO, as well as the
+PERSIANN CCS product. In its best configuration the Hydronn retrieval yields
+retrieval accuracy superior to that of the IMERG Final product across most
+considered metrics.
+
+\subsection{Information content of VIS/IR observations}
+
+The three tested retrieval configurations use input observation of increasing
+information content. The \hydronnfourir{} configuration only uses a single IR
+channel at a resolution of $4\ \unit{km}$ while \hydronnfourall{} uses all
+available bands. The best performing retrieval, \hydronntwo{}, combines the
+observations from all channels of the GOES ABI at their native resolutions.
+Clear increases in retrieval performance are observed when all ABI bands are
+incorporated into the retrieval as well as when all channels are ingested at
+their native resolutions. This demonstrates the ability of the
+neural-network-based retrieval to learn complex relationships even from input
+observations with low information content. Moreover, the fact that HYDRO and
+\hydronnfourir{} use the same observations as retrieval input further highlights
+the need for advanced statistical retrieval techniques to fully exploit the
+potential of current geostationary satellite observation. This is in good
+agreement with the results found by \citet{sadeghi19}.
+
+\subsection{Probabilistic precipitation retrievals}
+
+A novel aspect of the proposed precipitation retrievals is their ability to
+provide probabilistic precipitation estimates. In this study we have
+demonstrated multiple ways in how this may improve the utility of the retrieval
+results:
+
+\begin{enumerate}
+  \item The results in Fig.~\ref{fig:rain_rate_distributions} show that samples
+    from the retrieval posterior reproduce the gauge-measured distribution of
+    rain rates fairly accurately. The deviations of the distribution of the
+    posterior mean from the gauge measurements can thus be understood as a
+    consequence by the statistical properties of this estimator instead of a
+    retrieval deficiency. The random samples may be useful for applications that
+    are sensitive to heavy precipitation rates, such as run off modeling or
+    climatological studies. As an example, Fig.~\ref{fig:quantile_scatter} shows
+    scatter plots of the 99th percentile of the distribution of gauge-measured
+    and retrieved precipitation during December 2020 for all gauge station. Also
+    here the Hydronn retrievals yield the best estimates. For this evaluation,
+    HYDRO and PERSIANN CCS yield similar accuracy as IMERG despite IMERG having
+    higher accuracy for all other metrics considered in this study. This is
+    likely because both HYDRO and PERSIANN CCS were both developed to correctly
+    represent heavy precipitation, which harms their accuracy in terms of other
+    statistics. By explicitly resolving the probabilistic nature of the
+    precipitation retrieval, HYDRONN can provide both climatologically accurate
+    accumulations (see Tab.~\ref{tab:metrics}) and correct representation of
+    heavy precipitation.
+
+    It should be noted, however, that these random samples do not take into
+    account spatial correlations. To what extent this may negatively impact
+    applications of the retrieval results remains to be investigated in a
+    follow-up study.
+
+\item The retrieved quantiles allow the derivation of confidence intervals to
+  quantify retrieval uncertainty. By correcting for the difference in a priori
+  distributions as well as the degeneracy of quantiles due to discontinuities in
+  the CDF of gauge measurements, we were able to show that the retrieval
+  uncertainties are well calibrated even against gauge measurements
+  (Fig.~\ref{fig:calibration}). Due to the large uncertainties that are inherent
+  to precipitation retrieval from VIS/IR observations
+  (Fig.~\ref{fig:evaluation_scatter}, \ref{fig:daily_accumulations}),
+  quantifying them increases the trustworthiness of the predictions.
+\item We have shown that the retrieved quantiles can be used to detect
+  heavy precipitation events (Fig.~\ref{fig:pr_curves},
+  Tab.~\ref{tab:metrics}). Here all Hydronn retrievals perform better than IMERG
+  although they are based on observations with a significantly lower information
+  content. This clearly shows the benefits of quantifying the retrieval
+  uncertainties. Moreover, we were able to show that the probabilistic detection
+  of these events is fairly well calibrated
+  (Fig.\ref{fig:classification_calibration}).
+
+  \begin{figure}[!hbpt]
+    \centering
+    \includegraphics[width=0.8\textwidth]{figs/fig15}
+    \caption{
+      The 99th quantile of the distribution of gauge measurements of each gauge
+      station plotted against the 99th quantile of the corresponding
+      distribution of retrieved precipitation.
+    }
+    \label{fig:quantile_scatter}
+  \end{figure}
+
+  These results, however, also show the limitation of VIS/IR retrievals since
+  even for events exceeding $5\ \unit{mm\ h^{-1}}$ the maximum detection
+  confidence is $60\ \unit{\%}$. This certainly puts the suitability of any of
+  the considered retrievals to detect heavy precipitation events into question
+  and calls for new approaches that combine observations from different
+  observational sources.
+\end{enumerate}
+
+Finally, we have also investigated how uncertainties from instantaneous
+precipitation retrievals can be propagated to the full hour. The two approaches
+that we have tested correspond to assuming temporally independent and temporally
+dependent retrieval uncertainties. Our results indicate
+(Fig.~\ref{fig:rain_rate_distributions}, Fig.~\ref{fig:calibration}) that the
+assumption of dependent uncertainties overestimates the actual retrieval
+uncertainty, whereas assuming independent uncertainties underestimates actual
+uncertainties. It is interesting to note that the way the uncertainties are
+accumulated does not affect the detection of extreme events
+(Fig.~\ref{fig:pr_curves}), which indicates that the probabilities could also
+be re-calibrated a posteriori.
+
+\subsection{Utility of a priori corrections}
+
+We have proposed a method to correct for the distribution of precipitation rates
+in the training data. The corrections have improved the agreement between the
+distribution of retrieved precipitation rates as well as the calibration of the
+uncertainty intervals (Fig.~\ref{fig:rain_rate_distributions},
+Fig.~\ref{fig:calibration}). Although for the assumed independent uncertainties
+the calibration was improved, the distribution of precipitation rates did
+exhibit slight deviations from the distribution of the gauge measurements. We
+suspect that the reason for the correction working worse in the latter case is
+that the a corresponding a priori assumption deviates stronger from the
+distribution of the gauge measurements (Fig.~\ref{fig:correction_factors}). This
+led to much higher correction factors, which were truncated to avoid numerical
+issues.
+
+The clearest effect of the a priori correction was observed when the predicted
+confidence intervals were evaluated against gauge data
+(Fig.~\ref{fig:calibration}). This allowed us to show that the Hydronn
+retrievals can provide well-calibrated uncertainty estimates for their
+predictions when the differences between the a priori distributions of the
+training data and the gauge measurements are taken into account. Nonetheless,
+the correction did not affect the detection of strong precipitation. We suspect
+the reason for this to be that the correction mostly affects small precipitation
+rates due to their high occurrence in the training and validation data as well
+as the re-calibrating effect of the varying probability threshold in the
+generation of the PR curves.
+
+The correction relies on the assumptions that the conditional distribution of
+the observations vector $p(\mathbf{y}|x)$ given the rain rate $x$ remains
+constant. It thus can only correct for differences in the measurement
+characteristics between the rain gauge data, which is used to evaluate the
+retrieval, and the GPM data, which was used to derive the training data. It can
+not, however, correct for differences between the training and evaluation data
+that involves changes in the observed processes, which would change
+$p(\mathbf{y}|x)$. We argue that this is not an issue for this study since the
+evaluation and training data are overlapping geographically.
+
+\conclusions
+
+Hydronn, the presented neural-network-based precipitation retrieval, improves
+real time precipitation estimates over Brazil. Its performance is superior to
+both the currently operational algorithm as well as the much more complex global
+IMERG Final product, which combines observations from both VIS/IR and passive
+microwave sensors as well as global gauge measurements.
+
+Our results demonstrate the potential of designing region specific retrieval
+algorithms, which exploit the full potential of locally available satellite
+observations. This is made possible by the availability of accurate surface
+precipitation retrievals from the GPM CO satellite, which were used to derived
+the training data for the retrieval. Since this data is available globally
+between $-60$ and $60\ \unit{^\circ N}$, the approach can potentially be applied
+to most other regions around the world.
+
+Although our evaluation focused on Brazil, many of the results presented here
+should be of interest for precipitation retrievals from geostationary satellites
+in general. In addition to providing further evidence of the potential of deep
+neural networks to improve quantitative precipitation estimates, we show how a
+probabilistic regression approach can be used to perform VIS/IR precipitation
+retrievals using a Bayesian framework and that the probabilistic predictions help
+to better characterize the retrieval results and identify heavy precipitation.
+
+Finally, the fact that our relatively simple retrieval outperforms state of the
+art precipitation products despite being solely based on VIS/IR observations
+shows the potential of algorithmic innovation for quantitative precipitation
+estimation. The ability of the neural network retrieval to leverage information
+from all channels of the ABI at their native resolutions, shows the strength of
+the end-to-end approach to retrieval design. This suggests that further
+improvements for precipitation retrievals should be achievable by expanding the
+retrieval input to incorporate additional spectral as well as temporal
+information.
+
+
+
+
 %% It is strongly recommended to make use of these sections in case data sets and/or software code have been part of your research the article is based on.
 
-\codeavailability{TEXT} %% use this section when having only software code available
+\codeavailability{
+  The code to generate the retrieval training data, train the retrieval models, run the retrievals and analyze
+  the results is available in public repositor \citep{hydronn22}.
+} %% use this section when having only software code available
 
 
-\dataavailability{TEXT} %% use this section when having only data sets available
+%\dataavailability{TEXT} %% use this section when having only data sets available
 
 
-\codedataavailability{TEXT} %% use this section when having data sets and software code available
+%\codedataavailability{TEXT} %% use this section when having data sets and software code available
 
 
-\sampleavailability{TEXT} %% use this section when having geoscientific samples available
+%\sampleavailability{TEXT} %% use this section when having geoscientific samples available
 
 
-\videosupplement{TEXT} %% use this section when having video supplements available
+%\videosupplement{TEXT} %% use this section when having video supplements available
 
 
 \appendix
@@ -522,16 +1414,14 @@ Hydronn$_{4, \text{all}}$ indep. (corr.) & 0.0210 & 1.9417 & 0.4537 & 1.1927 \\
 \appendixtables   %% needs to be added in front of appendix tables
 
 
-\authorcontribution{TEXT} %% this section is mandatory
+\authorcontribution{II, PE and SP designed the study. SP and II developed the retrieval and analyzed the retrieval results. SP prepared the manuscript. AC and DV provided the gauge measurements, HYDRO retrieval results and valuable feedback. } %% this section is mandatory
 
-\competinginterests{TEXT} %% this section is mandatory even if you declare that no competing interests are present
-
-\disclaimer{TEXT} %% optional section
+\competinginterests{No competing iterests are present.} %% this section is mandatory even if you declare that no competing interests are present
 
 \begin{acknowledgements}
-TEXT
+  We would like to acknowledge the Brazilian National Institute of Meteorology
+  for the provision of the gauge measurements.
 \end{acknowledgements}
-
 
 
 
