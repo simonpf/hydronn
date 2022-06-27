@@ -788,7 +788,7 @@ def retrieve(model,
         quantiles = []
         mean = []
 
-        model.model.to(device)
+        model.model = model.model.to(device)
 
         for i in range(tiler.M):
 
