@@ -14,10 +14,10 @@ MED_RES_CHANNELS = [1, 3, 5]
 HI_RES_CHANNELS = [2]
 
 
-ROW_START = 2450
-ROW_END = ROW_START + 1920
-COL_START = 2750
-COL_END = COL_START + 1920
+ROW_START = 2450 - 64
+ROW_END = ROW_START + 2048
+COL_START = 2750 - 64
+COL_END = COL_START + 2048
 
 
 def find_goes_16_l1b_files(path, recursive=True):
@@ -112,7 +112,7 @@ class GOES16File:
 
         time = pd.Timestamp(time).to_pydatetime()
         start_time = time - timedelta(minutes=5)
-        end_time = start_time + timedelta(minutes=10)
+        end_time = start_time + timedelta(minutes=5)
 
         product = goes_16_l1b_radiances_all_full_disk
         provider = GOESAWSProvider(goes_16_l1b_radiances_all_full_disk)
