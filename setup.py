@@ -18,7 +18,7 @@ setup(
     entry_points = {
         'console_scripts': ['hydronn=hydronn.bin:hydronn'],
     },
-    packages=["hydronn"],
+    packages=find_packages(),
     python_requires=">=3.6",
     project_urls={
         "Source": "https://github.com/simonpf/hydronn/",
