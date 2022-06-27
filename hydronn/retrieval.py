@@ -788,7 +788,7 @@ def retrieve(model,
         quantiles = []
         mean = []
 
-        model.model = model.model.to(device)
+        model.model.to(device)
 
         for i in range(tiler.M):
 
@@ -800,7 +800,7 @@ def retrieve(model,
 
                 with torch.no_grad():
                     # Retrieve tile
-                    x_t = tiler.get_tile(i, j)
+                    x_t = tiler.get_tile(i, j).to(device)
                     slices = tiler.get_slices(i, j)
 
                     y_pred = model.model(x_t)[(...,) + slices]
