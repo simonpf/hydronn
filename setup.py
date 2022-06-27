@@ -8,7 +8,7 @@ with open(path.join(here, "README.md"), encoding="utf-8") as f:
 setup(
     name="hydronn",
     version="0.0",
-    description="Neural-network precipitation nowcasting for Brazil.",
+    description="Neural-network precipitation retrieval for Brazil.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/simonpf/hydronn",

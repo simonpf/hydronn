@@ -111,7 +111,7 @@ class GOES16File:
         from pansat.download.providers.goes_aws import GOESAWSProvider
 
         time = pd.Timestamp(time).to_pydatetime()
-        start_time = time - timedelta(minutes=5)
+        start_time = time - timedelta(minutes=10)
         end_time = start_time + timedelta(minutes=5)
 
         product = goes_16_l1b_radiances_all_full_disk
@@ -141,6 +141,46 @@ class GOES16File:
                 provider.download_file(f, path)
             files.append(path)
         return GOES16File(files)
+
+    @staticmethod
+    def download_latest(cache=None, no_cache=False):
+        """
+        Download latest GOES files from NOAA AWS bucket.
+
+        Args:
+            cache: Folder to store downloaded files and to look for already
+                existing files.
+            no_cache: Disable cache.
+
+        Return:
+            GOES16File object
+        """
+        from pansat.products.satellite.goes import goes_16_l1b_radiances_all_full_disk
+        from pansat.download.providers.goes_aws import GOESAWSProvider
+
+        time = datetime.utcnow()
+        year = time.year
+        day = int(time.strftime("%j"))
+
+        product = goes_16_l1b_radiances_all_full_disk
+        provider = GOESAWSProvider(goes_16_l1b_radiances_all_full_disk)
+        files = provider.get_files_by_day(year, day)
+        files = sorted(files, key=product.filename_to_date)[-16:]
+
+        if cache is None:
+            dest = Path(product.default_destination)
+        else:
+            dest = Path(cache)
+
+        dest.mkdir(parents=True, exist_ok=True)
+
+        local_files = []
+        for filename in files:
+            path = dest / filename
+            if not path.exists() or no_cache:
+                provider.download_file(filename, path)
+            local_files.append(path)
+        return GOES16File(local_files)
 
     @staticmethod
     def open_files(files):

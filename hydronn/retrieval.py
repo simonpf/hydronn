@@ -800,7 +800,8 @@ def retrieve(model,
 
                 with torch.no_grad():
                     # Retrieve tile
-                    x_t = tiler.get_tile(i, j).to(device)
+                    x_t = tiler.get_tile(i, j)
+                    x_t = [t.to(device) for t in x_t]
                     slices = tiler.get_slices(i, j)
 
                     y_pred = model.model(x_t)[(...,) + slices]
