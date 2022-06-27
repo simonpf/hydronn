@@ -5,7 +5,7 @@ import re
 import numpy as np
 import pandas as pd
 
-# import torch
+import torch
 import xarray as xr
 
 
@@ -114,11 +114,13 @@ class GOES16File:
         start_time = time - timedelta(minutes=5)
         end_time = start_time + timedelta(minutes=10)
 
+        product = goes_16_l1b_radiances_all_full_disk
         provider = GOESAWSProvider(goes_16_l1b_radiances_all_full_disk)
         files = []
 
+
         if cache is None:
-            dest = Path(p.default_destination)
+            dest = Path(product.default_destination)
         else:
             dest = Path(cache)
 
@@ -128,7 +130,8 @@ class GOES16File:
             filenames = provider.get_files_in_range(
                 start_time, end_time, start_inclusive=False
             )
-        except Exception:
+        except Exception as e:
+            raise e
             return None
         if not filenames:
             return None
@@ -204,7 +207,7 @@ class GOES16File:
 
     def extract_inputs(self):
         """
-        Extract observations over brasil and return as dictionary mapping
+        Extract observations over Brazil and return as dictionary mapping
         channel numbers to the corresponding observations.
         """
         inputs = {}
@@ -241,6 +244,21 @@ class GOES16File:
                 inputs[c] = x
         return inputs
 
+    def get_area(self):
+        """
+        Return the ``pyresample.geometry.AreaDefinition`` defining the area of the
+        retrieval results.
+        """
+        return self.scene.coarsest_area()[ROW_START:ROW_END, COL_START:COL_END]
+
+    def get_10u(self):
+        """
+        Return GOES 10.3 um observations.
+        """
+        self.scene.load(["C13"])
+        return self.scene["C13"][ROW_START:ROW_END, COL_START: COL_END].compute()
+
+
     def get_retrieval_input(self, normalizer=None):
         """
         Get retrieval input as normalized torch tensors.
@@ -253,7 +271,6 @@ class GOES16File:
             Tuple ``(x_low, x_med, x_high)`` of torch.Tensors containing
             the low-, medium- and high-resolution observations.
         """
-        low_res, med_res, hi_res = self.extract_input()
         m = ROW_END - ROW_START
         n = COL_END - COL_START
 
@@ -261,38 +278,35 @@ class GOES16File:
 
         low_res = []
         for c in LOW_RES_CHANNELS:
-            channel_name = f"C{c:02}"
-            if channel_name in inputs:
+            if c in inputs:
                 x = inputs[c]
             else:
-                x = np.zeros((m, n), dytpe=np.float32)
+                x = np.zeros((m, n), dtype=np.float32)
             low_res.append(x)
-        low_res = np.stack(low_res, axis=-1)[np.newaxis]
+        low_res = np.stack(low_res, axis=0)[np.newaxis]
 
         med_res = []
         for c in MED_RES_CHANNELS:
-            channel_name = f"C{c:02}"
-            if channel_name in inputs:
+            if c in inputs:
                 x = inputs[c]
             else:
-                x = np.zeros((2 * m, 2 * n), dytpe=np.float32)
+                x = np.zeros((2 * m, 2 * n), dtype=np.float32)
             med_res.append(x)
-        med_res = np.stack(med_res, axis=-1)[np.newaxis]
+        med_res = np.stack(med_res, axis=0)[np.newaxis]
 
         hi_res = []
         for c in HI_RES_CHANNELS:
-            channel_name = f"C{c:02}"
-            if channel_name in inputs:
+            if c in inputs:
                 x = inputs[c]
             else:
-                x = np.zeros((4 * m, 4 * n), dytpe=np.float32)
+                x = np.zeros((4 * m, 4 * n), dtype=np.float32)
             hi_res.append(x)
-        hi_res = np.stack(hi_res, axis=-1)[np.newaxis]
+        hi_res = np.stack(hi_res, axis=0)[np.newaxis]
 
         if normalizer is not None:
-            low_res = normalizer[0](low_res[np.newaxis])
-            med_res = normalizer[1](med_res[np.newaxis])
-            hi_res = normalizer[2](hi_res[np.newaxis])
+            low_res = normalizer[0](low_res)
+            med_res = normalizer[1](med_res)
+            hi_res = normalizer[2](hi_res)
 
         return (torch.tensor(low_res), torch.tensor(med_res), torch.tensor(hi_res))
 

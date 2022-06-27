@@ -731,3 +731,118 @@ class Evaluator:
         for f in self.input_files:
             results.append(self._run_file(f))
         return xr.concat(results, "samples")
+
+
+
+def retrieve(model,
+             retrieval_input,
+             quantiles=None,
+             device="cpu",
+             tile_size=None,
+             overlap=0):
+        """
+        Run Hydronn retrieval a single GOES 16 observations.
+
+        Args:
+            retrieval_input: The normalized retrieval input.
+            quantiles: A list of quantile fractions defining quantiles to
+                include in the output.
+            tile_size: Size of the tiles to use for the retrieval.
+            overlap: Overlap to use for neighboring tiles.
+
+        Return:
+            An 'xarray.Dataset' containing the retrieval results.
+        """
+        taus = [
+            0.01,
+            0.05,
+            0.1,
+            0.2,
+            0.3,
+            0.4,
+            0.5,
+            0.6,
+            0.7,
+            0.8,
+            0.9,
+            0.95,
+            0.99,
+            0.999,
+        ]
+
+        bins = torch.Tensor(model.bins).to(device)
+        d_bins = bins[1:] - bins[:-1]
+
+        # If not tile size is given, run retrieval on full input.
+        if tile_size is None:
+            tile_size = (1920, 1920)
+
+        tiler = Tiler(
+            retrieval_input,
+            tile_size=tile_size,
+            overlap=overlap,
+            resolution=model.resolution,
+        )
+
+        sample = []
+        quantiles = []
+        mean = []
+
+        model.model.to(device)
+
+        for i in range(tiler.M):
+
+            sample.append([])
+            quantiles.append([])
+            mean.append([])
+
+            for j in range(tiler.N):
+
+                with torch.no_grad():
+                    # Retrieve tile
+                    x_t = tiler.get_tile(i, j)
+                    slices = tiler.get_slices(i, j)
+
+                    y_pred = model.model(x_t)[(...,) + slices]
+                    y_pred = model._post_process_prediction(y_pred, bins)
+
+                    for t in x_t:
+                        del t
+
+                    sample[-1].append(
+                        qd.sample_posterior(y_pred, bins).cpu().numpy()[:, 0]
+                    )
+                    quantiles[-1].append(
+                        qd.posterior_quantiles(y_pred, bins, taus)
+                        .cpu()
+                        .numpy()
+                        .transpose([0, 2, 3, 1])
+                    )
+                    mean[-1].append(
+                        qd.posterior_mean(y_pred, bins).cpu().numpy()
+                    )
+
+                    del y_pred
+
+        # Finally, concatenate over rows and columns.
+        sample = np.concatenate([np.concatenate(r, -1) for r in sample], -2)
+        quantiles = np.concatenate(
+            [np.concatenate(r, -2) for r in quantiles], -3
+        )
+        mean = np.concatenate([np.concatenate(r, -1) for r in mean], -2)
+
+        dims = ("time", "x", "y")
+        dims_r = ("time", "x", "y")
+        if mean.shape[-2] != retrieval_input[0].shape[-2]:
+            dims_r = ("time", "x_4", "y_4")
+
+        results = xr.Dataset(
+            {
+                "tau": (("tau",), taus),
+                "surface_precip": (dims_r, mean),
+                "surface_precip_sampled": (dims_r, sample),
+                "surface_precip_quantiles": (dims_r + ("tau",), quantiles),
+            }
+        )
+
+        return results
