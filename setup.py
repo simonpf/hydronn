@@ -14,7 +14,7 @@ setup(
     url="https://github.com/simonpf/hydronn",
     author="Simon Pfreundschuh",
     author_email="simon.pfreundschuh@chalmers.se",
-    install_requires=["numpy", "xarray", "torch"],
+    install_requires=["numpy", "xarray", "torch", "quantnn"],
     entry_points = {
         'console_scripts': ['hydronn=hydronn.bin:hydronn'],
     },
