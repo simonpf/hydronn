@@ -16,6 +16,9 @@ import numpy as np
 import pandas as pd
 import xarray as xr
 from pansat.download.providers.ges_disc import GesdiscProvider
+from pyresample.geometry import SwathDefinition
+from pyresample.kd_tree import resample_nearest
+from hydronn.definitions import ROI, BRAZIL
 
 
 GPM_FILES = open(Path(__file__).parent / "../files/gpm_files.txt").readlines()
@@ -165,6 +168,55 @@ class GPMCMBFile:
         """
         dataset = self.to_xarray_dataset(roi=roi)
         return extract_scenes(dataset, scans_per_scene)
+
+    def resample(self):
+        """
+        Resample surface precipitation data to GOES 2km grid over Brazil.
+
+        Return:
+            An ``xarray.Dataset`` containing the resampled data.
+        """
+        data = self.to_xarray_dataset(roi=ROI)
+        lons = data.longitude.data
+        lats = data.latitude.data
+        swath = SwathDefinition(lons=lons, lats=lats)
+
+        precip_r = resample_nearest(
+            swath,
+            data.surface_precip.data,
+            BRAZIL,
+            radius_of_influence=10e3,
+            fill_value=np.nan,
+        )
+
+        i_c = lats.shape[1] // 2
+        swath = SwathDefinition(lons=lons[:, i_c], lats=lats[:, i_c])
+        time_type = data.scan_time.data.dtype
+        time_r = resample_nearest(
+            swath,
+            data.scan_time.data.astype(np.int64),
+            BRAZIL,
+            radius_of_influence=10e3,
+            fill_value=-99
+        )
+        mask = time_r < 0
+        time_r = time_r[~mask].mean()
+        time_r = time_r.astype(time_type)
+
+        lons, lats = BRAZIL.get_lonlats()
+        lons = lons[0]
+        lats = lats[::-1, 0]
+
+        dataset = xr.Dataset(
+            {
+                "latitude": (("latitude",), lats),
+                "longitude": (("longitude",), lons),
+                "surface_precip": (("longitude", "latitude"),
+                                   precip_r),
+            }
+        )
+        dataset.attrs["time"] = time_r
+        return dataset
 
 
 GPM_FILES_SORTED = {}

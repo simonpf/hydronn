@@ -12,14 +12,24 @@ from h5py import File
 import numpy as np
 import pandas as pd
 import xarray as xr
+from pyresample import create_area_def
+from pyresample.kd_tree import resample_nearest
 
-from hydronn.definitions import ROI
+from hydronn.definitions import ROI, BRAZIL
 
 
 ###############################################################################
 # ImergFile
 ###############################################################################
 
+
+IMERG_GRID = create_area_def(
+    'IMERG',
+    {'proj': 'longlat', 'datum': 'WGS84'},
+    area_extent=[-180, -90, 180, 90],
+    resolution=0.1,
+    units='degrees',
+)
 
 class ImergFile:
     """
@@ -131,6 +141,42 @@ class ImergFile:
 
         return dataset
 
+    def resample(self):
+        """
+        Resample IMERG data to GOES 4 km grid over Brazil.
+
+        Return:
+            An ``xarray.Dataset`` containing the resampled observations.
+        """
+        with File(str(self.filename), "r") as data:
+            precip = data["Grid/precipitationCal"][:]
+            precip_r = resample_nearest(
+                IMERG_GRID,
+                precip[0].T[::-1],
+                BRAZIL,
+                radius_of_influence=10e3,
+                fill_value=np.nan,
+            )
+
+        lons, lats = BRAZIL.get_lonlats()
+        lons = lons[0]
+        lats = lats[::-1, 0]
+
+        start = pd.Timestamp(self.start_time).to_datetime64()
+        end = pd.Timestamp(self.end_time).to_datetime64()
+        time = start + 0.5 * (end - start)
+
+        dataset = xr.Dataset(
+            {
+                "latitude": (("latitude",), lats),
+                "longitude": (("longitude",), lons),
+                "time": (("time",), [time]),
+                "surface_precip": (("time", "longitude", "latitude"),
+                                   precip_r[np.newaxis]),
+            }
+        )
+        return dataset
+
 
 def load_and_interpolate_data(path, gauge_data):
     """
@@ -147,7 +193,6 @@ def load_and_interpolate_data(path, gauge_data):
     files = sorted(list(Path(path).glob("*.HDF5")))
     datasets = []
     for filename in files:
-        print(filename)
         data = ImergFile(filename).to_xarray_dataset(roi=ROI)
         datasets.append(
             data.interp(

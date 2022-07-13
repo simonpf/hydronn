@@ -9,9 +9,57 @@ from pathlib import Path
 
 import numpy as np
 import xarray as xr
+from pansat.time import to_datetime64
+from pyresample import create_area_def
+from pyresample.kd_tree import resample_nearest
 from pansat.products.satellite.persiann import CCS
-
 from hydronn import definitions
+from hydronn.definitions import BRAZIL
+
+CCS_GRID = create_area_def(
+    'IMERG',
+    {'proj': 'longlat', 'datum': 'WGS84'},
+    area_extent=[-180, -60, 180, 60],
+    resolution=0.04,
+    units='degrees',
+)
+
+def resample(filename):
+    """
+    Resample IMERG data to GOES 4 km grid over Brazil.
+
+    Return:
+        An ``xarray.Dataset`` containing the resampled observations.
+    """
+    product = CCS()
+    data = product.open(filename).rename({"precipitation": "surface_precip"})
+    precip = data["surface_precip"].data
+
+    lons, lats = CCS_GRID.get_lonlats()
+
+    precip_r = resample_nearest(
+        CCS_GRID,
+        precip,
+        BRAZIL,
+        radius_of_influence=5e3,
+        fill_value=np.nan,
+    )
+
+    lons, lats = BRAZIL.get_lonlats()
+    lons = lons[0]
+    lats = lats[::-1, 0]
+
+    time = to_datetime64(product.filename_to_date(filename))
+
+    dataset = xr.Dataset({
+        "latitude": (("latitude",), lats),
+        "longitude": (("longitude",), lons),
+        "time": (("time",), [time]),
+        "surface_precip": (("time", "longitude", "latitude"),
+                           precip_r[np.newaxis]),
+    })
+
+    return dataset
 
 
 def load_and_interpolate_data(path, gauge_data):
@@ -30,7 +78,6 @@ def load_and_interpolate_data(path, gauge_data):
     product = CCS()
     datasets = []
     for filename in files:
-        print(filename)
         data = product.open(filename).rename({"precipitation": "surface_precip"})
         datasets.append(
             data.interp(
