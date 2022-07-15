@@ -26,20 +26,27 @@ CCS_GRID = create_area_def(
 
 def resample(filename):
     """
-    Resample IMERG data to GOES 4 km grid over Brazil.
+    Resample PERSIANN data to GOES 4 km grid over Brazil.
 
     Return:
         An ``xarray.Dataset`` containing the resampled observations.
     """
     product = CCS()
     data = product.open(filename).rename({"precipitation": "surface_precip"})
+    left = data[{"longitude": slice(4500, None)}]
+    right = data[{"longitude": slice(0, 4500)}]
+    data = xr.concat([left, right], dim="longitude")
+    longitude_new = data.longitude.data
+    longitude_new[:4500] -= 360
+    data["longitude"] = longitude_new
+
     precip = data["surface_precip"].data
 
     lons, lats = CCS_GRID.get_lonlats()
 
     precip_r = resample_nearest(
         CCS_GRID,
-        precip,
+        precip[0],
         BRAZIL,
         radius_of_influence=5e3,
         fill_value=np.nan,
@@ -47,7 +54,7 @@ def resample(filename):
 
     lons, lats = BRAZIL.get_lonlats()
     lons = lons[0]
-    lats = lats[::-1, 0]
+    lats = lats[:, 0]
 
     time = to_datetime64(product.filename_to_date(filename))
 
@@ -120,7 +127,6 @@ def calculate_accumulations(path, start=None, end=None):
             date = np.datetime64(f"20{year}-01-01T00:00:00") + np.array(
                 int(doy) * 24 + int(hour)
             ).astype("timedelta64[h]")
-            print(date)
             if date < start or date >= end:
                 continue
 
