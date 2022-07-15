@@ -6,12 +6,29 @@ hydronn.data.hydroestimator
 This module provides functions to load the hydroestimator data.
 """
 from pathlib import Path
+import subprocess
+import io
+import re
 
 import numpy as np
 import xarray as xr
+from pyresample import create_area_def
+from pyresample.kd_tree import resample_nearest
+from pyresample.geometry import SwathDefinition
 import scipy
 from scipy.interpolate import RegularGridInterpolator
 from scipy.interpolate import interp1d
+
+from hydronn.definitions import BRAZIL
+
+
+HYDRO_GRID = create_area_def(
+    'HYDRO',
+    {'proj': 'longlat', 'datum': 'WGS84'},
+    area_extent=[-82, -44.95, -30.3989963, 13.03364],
+    resolution=(0.0382513, 0.0359477),
+    units='degrees',
+)
 
 
 class Correction:
@@ -60,10 +77,18 @@ def load_file(filename, correction=None):
     Return:
         A 1613 x 1349 array containing the rainrates from the file.
     """
+    filename = Path(filename)
     M = 1613
     N = 1349
     try:
-        precip = np.fromfile(filename, dtype="u2").reshape((M, N))
+        if filename.suffix == ".gz":
+            decompressed = io.BytesIO()
+            args = ["gunzip", "-c", str(filename)]
+            with subprocess.Popen(args, stdout=subprocess.PIPE) as proc:
+                decompressed.write(proc.stdout.read())
+                precip = np.frombuffer(decompressed, dtype="u2").reshape((M, N))
+        else:
+            precip = np.fromfile(filename, dtype="u2").reshape((M, N))
         precip = precip.astype(np.float32) / 10.0
         precip = precip[::-1, :]
         if correction is not None:
@@ -116,6 +141,69 @@ def get_date(filename):
     minute = time[10:12]
     s = f"{year}-{month}-{day}T{hour}:{minute}:00"
     return np.datetime64(s)
+
+
+class Hydroestimator:
+    """
+    Product class for representing hydrometeor files.
+    """
+    def __init__(self, correction=None):
+        """
+        Create product instance.
+
+        Args:
+            correction: Optional path of a CDF correction to apply to
+                the data.
+        """
+        if correction is not None:
+            correction = Correction(correction)
+        self.correction = correction
+        self.filename_regexp = re.compile("S\d{8}_\d{12}\.bin(\.gz){0,1}")
+
+    def filename_to_date(self, filename):
+        """
+        Extract date from filename.
+
+        Args:
+            filename: Filename of a file containing Hydrometeor results.
+
+        Return:
+            ``datetime.datetime`` object representing the start time of
+            the given Hydrometeor file.
+        """
+        return get_date(filename)
+
+    def open(self, filename):
+        """
+        Load the Hydrometeor results into an ``xarray.Dataset``.
+
+        Args:
+            filename: Name of a file containing Hydrometeor results.
+
+        Return:
+            The Hydrometeor results as ``xarray.Dataset``.
+        """
+        precip = load_file(filename, correction=self.correction)
+        lats, lons = get_lats_and_lons()
+
+        precip_r = resample_nearest(
+            HYDRO_GRID,
+            precip[::-1],
+            BRAZIL,
+            radius_of_influence=5e3,
+            fill_value=np.nan,
+        )
+
+        lons, lats = BRAZIL.get_lonlats()
+        lons = lons[0]
+        lats = lats[::-1, 0]
+
+        dataset = xr.Dataset({
+            "latitude": (("latitude",), lats),
+            "longitude": (("longitude",), lons),
+            "surface_precip": (("latitude", "longitude"), precip_r)
+        })
+        return dataset
 
 
 def load_data(data_path):
