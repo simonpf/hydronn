@@ -299,9 +299,9 @@ class Tiler:
         else:
             i_clip_l = self.i_clip[i - 1] // scaling
         if i >= self.M - 1:
-            i_clip_r = None
+            i_clip_r = self.tile_size[0]
         else:
-            i_clip_r = -self.i_clip[i] // scaling
+            i_clip_r = self.tile_size[0] - self.i_clip[i] // scaling
         slice_i = slice(i_clip_l, i_clip_r)
 
         if j == 0:
@@ -309,12 +309,100 @@ class Tiler:
         else:
             j_clip_l = self.j_clip[j - 1] // scaling
         if j >= self.N - 1:
-            j_clip_r = None
+            j_clip_r = self.tile_size[1]
         else:
-            j_clip_r = -self.j_clip[j] // scaling
+            j_clip_r = self.tile_size[0] - self.j_clip[j] // scaling
         slice_j = slice(j_clip_l, j_clip_r)
 
         return (slice_i, slice_j)
+
+    def get_weights(self, i, j):
+        """
+        Get weights to reassemble results.
+
+        Args:
+            i: Row-index of the tile.
+            j: Column-index of the tile.
+
+        Return:
+            Numpy array containing weights for the corresponding tile.
+        """
+        scaling = 1
+        if self.resolution > 2:
+            scaling = 2
+
+        sl_i, sl_j = self.get_slices(i, j)
+
+        m, n  = self.tile_size
+        w_i = np.ones((m // scaling, n // scaling))
+        if i > 0:
+            trans_start = self.i_start[i]
+            trans_end = self.i_start[i - 1] + self.tile_size[0]
+            l_trans = trans_end - trans_start
+            start = l_trans // scaling
+            w_i[:start] = np.linspace(0, 1, l_trans // scaling)[..., np.newaxis]
+        if i < self.M - 1:
+            trans_start = self.i_start[i + 1]
+            trans_end = self.i_start[i] + self.tile_size[0]
+            l_trans = trans_end - trans_start
+            start = (self.tile_size[0] - l_trans) // scaling
+            w_i[start:] = np.linspace(1, 0, l_trans // scaling)[..., np.newaxis]
+
+        w_j = np.ones((m // scaling, n // scaling))
+        if j > 0:
+            trans_start = self.j_start[j]
+            trans_end = self.j_start[j - 1] + self.tile_size[1]
+            l_trans = trans_end - trans_start
+            start = l_trans // scaling
+            w_j[:, :start] = np.linspace(0, 1, l_trans // scaling)[np.newaxis]
+        if j < self.N - 1:
+            trans_start = self.j_start[j + 1]
+            trans_end = self.j_start[j] + self.tile_size[1]
+            l_trans = trans_end - trans_start
+            start = (self.tile_size[1] - l_trans) // scaling
+            w_j[:, start:] = np.linspace(1, 0, l_trans // scaling)[np.newaxis]
+
+        return w_i * w_j
+
+    def assemble(self, slices):
+        """
+        Assemble slices back to original shape using linear interpolation in
+        overlap regions.
+
+        Args:
+            slices: List of lists of slices.
+
+        Return:
+            ``numpy.ndarray`` containing the data from the slices reconstructed
+            to the original shape.
+        """
+        slice_0 = slices[0][0]
+        scaling = 1
+        if self.resolution > 2:
+            scaling = 2
+
+        shape = slice_0.shape[:-2] + (self.m // scaling, self.n // scaling)
+        results = np.zeros(shape, dtype=slice_0.dtype)
+
+        for i, row in enumerate(slices):
+            for j, slc in enumerate(row):
+
+                i_start = self.i_start[i]
+                i_end = i_start + self.tile_size[0]
+                row_slice = slice(i_start // scaling, i_end // scaling)
+                j_start = self.j_start[j]
+                j_end = j_start + self.tile_size[1]
+                col_slice = slice(j_start // scaling, j_end // scaling)
+
+                output = results[..., row_slice, col_slice]
+                weights = self.get_weights(i, j)
+                output += weights * slc
+
+        return results
+
+
+
+
 
     def __repr__(self):
         return f"Tiler(tile_size={self.tile_size}, overlap={self.overlap})"
@@ -802,9 +890,8 @@ def retrieve(model,
                     # Retrieve tile
                     x_t = tiler.get_tile(i, j)
                     x_t = [t.to(device) for t in x_t]
-                    slices = tiler.get_slices(i, j)
 
-                    y_pred = model.model(x_t)[(...,) + slices]
+                    y_pred = model.model(x_t)[(...,)]
                     y_pred = model._post_process_prediction(y_pred, bins)
 
                     for t in x_t:
@@ -817,7 +904,6 @@ def retrieve(model,
                         qd.posterior_quantiles(y_pred, bins, taus)
                         .cpu()
                         .numpy()
-                        .transpose([0, 2, 3, 1])
                     )
                     mean[-1].append(
                         qd.posterior_mean(y_pred, bins).cpu().numpy()
@@ -826,11 +912,9 @@ def retrieve(model,
                     del y_pred
 
         # Finally, concatenate over rows and columns.
-        sample = np.concatenate([np.concatenate(r, -1) for r in sample], -2)
-        quantiles = np.concatenate(
-            [np.concatenate(r, -2) for r in quantiles], -3
-        )
-        mean = np.concatenate([np.concatenate(r, -1) for r in mean], -2)
+        sample = tiler.assemble(sample)
+        quantiles = tiler.assemble(quantiles).transpose([0, 2, 3, 1])
+        mean = tiler.assemble(mean)
 
         dims = ("time", "x", "y")
         dims_r = ("time", "x", "y")
