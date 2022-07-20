@@ -811,7 +811,7 @@ class Evaluator:
         )
 
         # Copy some info from input data.
-        time = input_file.data.gpm_time.data
+        time = input_data.data.gpm_time.data
         results["time"] = (("samples",), time)
 
         return results
