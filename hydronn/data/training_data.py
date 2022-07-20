@@ -115,6 +115,7 @@ class HydronnDataset:
         attribute is set to 'True'.
         """
         data = decompress_and_load(self.filename)
+        self.time = data.time_gpm.data
         hi_res = data["C02"].data[:, np.newaxis].astype(np.float32)
         med_res = np.stack(
             [

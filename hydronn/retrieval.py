@@ -745,7 +745,7 @@ class Evaluator:
         input_data = HydronnDataset(
             input_file,
             normalizer=self.normalizer,
-            batch_size=32,
+            batch_size=1,
             resolution=self.resolution,
         )
         tau = [
@@ -811,8 +811,7 @@ class Evaluator:
         )
 
         # Copy some info from input data.
-        time = input_data.data.gpm_time.data
-        results["time"] = (("samples",), time)
+        results["time"] = (("samples",), input_data.time)
 
         return results
 
