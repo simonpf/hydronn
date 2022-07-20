@@ -809,6 +809,11 @@ class Evaluator:
                 "surface_precip_true": (dims, truth),
             }
         )
+
+        # Copy some info from input data.
+        time = input_file.data.gpm_time.data
+        results["time"] = (("samples",), time)
+
         return results
 
     def run(self):
