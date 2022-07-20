@@ -141,6 +141,7 @@ class HydronnDataset:
             valid = np.any(np.isfinite(hi_res), (-3, -2, -1))
             valid += np.any(np.isfinite(med_res), (-3, -2, -1))
             valid += np.any(np.isfinite(low_res), (-3, -2, -1))
+        self.indices = np.where(valid)[0]
 
         LOGGER.info("Loaded %s valid samples: %s", valid.sum(), surface_precip.shape)
 

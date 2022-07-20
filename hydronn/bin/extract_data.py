@@ -24,9 +24,10 @@ def add_parser(subparsers):
     Add parser for 'extract_data' command to top-level CLI.
     """
     parser = subparsers.add_parser(
-            'extract_data',
-            description='Extract GOES/GPM CMB co-locations.'
-            )
+        'extract_data',
+        description='Extract GOES/GPM CMB co-locations.',
+        help="Extract training data."
+    )
     parser.add_argument(
         'year', metavar='year', type=int,
         help='The year for which to extract co-locations.'

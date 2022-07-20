@@ -29,7 +29,9 @@ def add_parser(subparsers):
     """
     parser = subparsers.add_parser(
         'extract_retrieval_data',
-        description='Extract input for the hydronn retrieval.')
+        description='Extract input for the hydronn retrieval.',
+        help="Extract retrieval input."
+    )
     parser.add_argument('year',
                         metavar='year',
                         type=int,

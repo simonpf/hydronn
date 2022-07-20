@@ -34,9 +34,10 @@ def add_parser(subparsers):
     Add parser for 'retrieve' command to top-level CLI.
     """
     parser = subparsers.add_parser(
-            'retrieve',
-            description='Run the hydronn retrieval.'
-            )
+        'retrieve',
+        help="Run the hydronn retrieval",
+        description='Run the hydronn retrieval.'
+    )
     parser.add_argument(
         'model', metavar='model', type=str,
         help='Path to the model to use for the retrieval.'

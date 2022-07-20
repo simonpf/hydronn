@@ -27,6 +27,7 @@ def add_parser(subparsers):
     """
     parser = subparsers.add_parser(
         "train",
+        help="Train a hydronn retrieval model.",
         description=(
             """
             Train the hydronn retrieval model.
