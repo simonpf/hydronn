@@ -8,6 +8,7 @@ This module provides functions to download and read level 2B
  the training data for the Hydronn retrieval.
 """
 from datetime import datetime
+import gzip
 from pathlib import Path
 import tempfile
 from urllib.parse import urlparse
@@ -20,8 +21,10 @@ from pyresample.geometry import SwathDefinition
 from pyresample.kd_tree import resample_nearest
 from hydronn.definitions import ROI, BRAZIL
 
-
-GPM_FILES = open(Path(__file__).parent / "../files/gpm_files.txt").readlines()
+GPM_FILES = gzip.open(
+    Path(__file__).parent / "../files/gpm_files.txt.gz",
+    mode="rt"
+).readlines()
 GPM_FILES = [name.strip() for name in GPM_FILES]
 
 from pansat.download.providers.ges_disc import GesdiscProvider
