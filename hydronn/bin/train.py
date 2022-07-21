@@ -73,7 +73,6 @@ def add_parser(subparsers):
         '--n_layers_head',
         metavar='n',
         type=int,
-        nargs=1,
         default=4,
         help='The number of layers in the head of the network.'
     )
@@ -89,7 +88,7 @@ def add_parser(subparsers):
         metavar='N',
         type=int,
         nargs="*",
-        default=2,
+        default=[2],
         help="The number of block in the stages of the encoder."
     )
     parser.add_argument(
@@ -175,7 +174,7 @@ def run(args):
         return 1
 
     resolution = args.resolution
-    n_blocks = args.n_blocks
+    n_blocks = args.n_blocks[0]
     n_features_body = args.n_features_body
     n_layers_head = args.n_layers_head
     n_features_head = args.n_features_head
