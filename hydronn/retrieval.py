@@ -716,15 +716,17 @@ class Evaluator:
     Processor class to evaluate the Hydronn model on test data.
     """
 
-    def __init__(self, input_files, model, normalizer, device="cuda", resolution=2):
+    def __init__(self, input_files, model, normalizer, device="cuda", resolution=2, ir=False):
         """
         Args:
             input_files: The list of input files for which to run the
                 retrieval.
-            model: The model to use for the retrieval.
+            model: The model to evaluate.
             normalizer: The normalizer object to use to normalize the
                 inputs.
             device: The device on which to run the retrieval.
+            resolution: The resolution of the model.
+            ir: Flag indicating whether the model is an IR-only model.
         """
         self.input_files = sorted(input_files)
         self.model = model
@@ -747,6 +749,8 @@ class Evaluator:
             normalizer=self.normalizer,
             batch_size=1,
             resolution=self.resolution,
+            shuffle=False,
+            ir=self.ir
         )
         tau = [
             0.01,

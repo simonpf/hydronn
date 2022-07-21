@@ -115,7 +115,11 @@ class HydronnDataset:
         attribute is set to 'True'.
         """
         data = decompress_and_load(self.filename)
-        self.time = data.time_gpm.data
+        try:
+            self.time = data.time_gpm.data
+        except AttributeError:
+            self.time = np.nan * np.ones(data.scenes.size)
+
         hi_res = data["C02"].data[:, np.newaxis].astype(np.float32)
         med_res = np.stack(
             [
@@ -143,6 +147,7 @@ class HydronnDataset:
             valid += np.any(np.isfinite(med_res), (-3, -2, -1))
             valid += np.any(np.isfinite(low_res), (-3, -2, -1))
         self.indices = np.where(valid)[0]
+        self.time = self.time[self.indices]
 
         LOGGER.info("Loaded %s valid samples: %s", valid.sum(), surface_precip.shape)
 
