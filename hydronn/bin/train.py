@@ -74,7 +74,7 @@ def add_parser(subparsers):
         metavar='n',
         type=int,
         nargs=1,
-        default=2,
+        default=4,
         help='The number of layers in the head of the network.'
     )
     parser.add_argument(
@@ -177,7 +177,7 @@ def run(args):
     resolution = args.resolution
     n_blocks = args.n_blocks
     n_features_body = args.n_features_body
-    n_layers_head = args.n_features_head
+    n_layers_head = args.n_layers_head
     n_features_head = args.n_features_head
     ir = args.ir
 
