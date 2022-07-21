@@ -52,6 +52,11 @@ def add_parser(subparsers):
         help='Device on which to run the retrieval.',
         default="cuda"
     )
+    parser.add_argument(
+        "--ir",
+        action="store_true",
+        help="Whether the evaluation is of an IR only model."
+    )
     parser.set_defaults(func=run)
 
 
@@ -105,6 +110,7 @@ def run(args):
                           model,
                           normalizer,
                           device=device,
-                          resolution=resolution)
+                          resolution=resolution,
+                          ir=args.ir)
     results = evaluator.run()
     save_and_compress(results, output_path)
