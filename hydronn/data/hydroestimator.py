@@ -5,6 +5,7 @@ hydronn.data.hydroestimator
 
 This module provides functions to load the hydroestimator data.
 """
+from datetime import datetime, timedelta
 from pathlib import Path
 import subprocess
 import io
@@ -86,7 +87,7 @@ def load_file(filename, correction=None):
             args = ["gunzip", "-c", str(filename)]
             with subprocess.Popen(args, stdout=subprocess.PIPE) as proc:
                 decompressed.write(proc.stdout.read())
-                precip = np.frombuffer(decompressed, dtype="u2").reshape((M, N))
+                precip = np.frombuffer(decompressed.read(), dtype="u2").reshape((M, N))
         else:
             precip = np.fromfile(filename, dtype="u2").reshape((M, N))
         precip = precip.astype(np.float32) / 10.0
@@ -172,6 +173,39 @@ class Hydroestimator:
             the given Hydrometeor file.
         """
         return get_date(filename)
+
+    def filename_to_start_time(self, filename):
+        """
+        Extract start time from filename.
+
+        Args:
+            filename: Filename of a file containing Hydrometeor results.
+
+        Return:
+            ``datetime.datetime`` object representing the start time of
+            the given Hydrometeor file.
+        """
+        name = Path(filename).name
+        time = name.split("_")[1]
+        year = int(time[:4])
+        month = int(time[4:6])
+        day = int(time[6:8])
+        hour = int(time[8:10])
+        minute = int(time[10:12])
+        return datetime(year, month, day, hour, minute)
+
+    def filename_to_end_time(self, filename):
+        """
+        Extract end time from filename.
+
+        Args:
+            filename: Filename of a file containing Hydrometeor results.
+
+        Return:
+            ``datetime.datetime`` object representing the start time of
+            the given Hydrometeor file.
+        """
+        return self.filename_to_start_time(filename) + timedelta(minutes=10)
 
     def open(self, filename):
         """
@@ -343,3 +377,40 @@ def calculate_accumulations(data_path, correction=None, start=None, end=None):
         }
     )
     return dataset
+
+
+def add_hydro_results(validation_data, hydro_catalog):
+    """
+    Add results from Hydroestimator to validation results.
+
+    Args:
+        validation_data: ``xarray.Dataset`` containing the evaluation
+            results.
+        hydro_catalog: Pansat catalog of available files.
+    """
+    n_scenes = validation_data.samples.size
+    dims = validation_data.surface_precip.dims
+    shape = validation_data.surface_precip.shape
+    validation_data["surface_precip_hydro"] = (dims, np.nan * np.ones(shape))
+    for i in range(n_scenes):
+        scene = validation_data[{"samples": i}]
+        time = scene.time.astype("datetime64[ns]").data
+        print(time)
+        hydro_files = hydro_catalog.find_file_covering(time.item())
+        if len(hydro_files) == 0:
+            continue
+
+        hydro_data = hydro_catalog.product.open(hydro_files[0])
+
+        x = scene.x_coords
+        y = scene.y_coords
+        x, y = xr.broadcast(x, y)
+        x = x.transpose("y", "x")
+        y = y.transpose("y", "x")
+        lons_val, lats_val = BRAZIL.get_lonlat_from_projection_coordinates(x, y)
+        lons_val = xr.DataArray(lons_val, dims=("y", "x"))
+        lats_val = xr.DataArray(lats_val, dims=("y", "x"))
+
+        sp_hydro = hydro_data.surface_precip.interp(latitude=lats_val,
+                                                    longitude=lons_val)
+        validation_data.surface_precip_hydro.data[i] = sp_hydro
