@@ -119,6 +119,12 @@ class HydronnDataset:
             self.time = data.time_gpm.data
         except AttributeError:
             self.time = np.nan * np.ones(data.scenes.size)
+        if self.resolution < 4:
+            self.x_coords = data.x_
+            self.y_coords = data.y_
+        else:
+            self.x_coords = data.x_[:, ::2, ::2]
+            self.y_coords = data.y_[:, ::2, ::2]
 
         hi_res = data["C02"].data[:, np.newaxis].astype(np.float32)
         med_res = np.stack(
@@ -148,6 +154,8 @@ class HydronnDataset:
             valid += np.any(np.isfinite(low_res), (-3, -2, -1))
         self.indices = np.where(valid)[0]
         self.time = self.time[self.indices]
+        self.x_coords = self.x_coords[self.indices]
+        self.y_coords = self.y_coords[self.indices]
 
         LOGGER.info("Loaded %s valid samples: %s", valid.sum(), surface_precip.shape)
 

@@ -805,7 +805,7 @@ class Evaluator:
         samples = np.concatenate(samples)
         truth = np.concatenate(truth)
 
-        dims = ("samples", "x", "y")
+        dims = ("samples", "y", "x")
         results = xr.Dataset(
             {
                 "surface_precip": (dims, means),
@@ -817,6 +817,8 @@ class Evaluator:
 
         # Copy some info from input data.
         results["time"] = (("samples",), input_data.time)
+        results["x_coords"] = (("samples", "x"), input_data.x_coords)
+        results["y_coords"] = (("samples", "y"), input_data.y_coords)
 
         return results
 
