@@ -733,6 +733,7 @@ class Evaluator:
         self.normalizer = normalizer
         self.device = device
         self.resolution = resolution
+        self.ir = ir
 
     def _run_file(self, input_file):
         """
