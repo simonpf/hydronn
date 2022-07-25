@@ -228,3 +228,52 @@ for f in GPM_FILES:
     year = gpm_file.start_time.year
     day = gpm_file.start_time.day
     GPM_FILES_SORTED.setdefault((year, day), []).append(f)
+
+
+def add_gprof_results(validation_data, gprof_catalog):
+    """
+    Add GPROF results to evaluation results.
+
+    Args:
+        validation_data: ``xarray.Dataset`` containing the results from
+            the validation.
+        gprof_catalog: The pansat catalog providing a reference to the
+            available files.
+    """
+    n_scenes = validation_data.samples.size
+    dims = validation_data.surface_precip.dims
+    shape = validation_data.surface_precip.shape
+    validation_data["surface_precip_gprof"] = (dims, np.nan * np.ones(shape))
+    for i in range(n_scenes):
+        scene = validation_data[{"samples": i}]
+        time = scene.time.astype("datetime64[ns]").data
+        gprof_files = gprof_catalog.find_file_covering(time.item())
+        if len(gprof_files) == 0:
+            continue
+
+        gprof_data = l2a_gprof_gpm_gmi.open(gprof_files[0])
+        start_time = time - np.timedelta64(5 * 60, "s").astype("timedelta64[ns]")
+        end_time = time + np.timedelta64(5 * 60, "s").astype("timedelta64[ns]")
+        scans = (gprof_data.scan_time > start_time) * (gprof_data.scan_time < end_time)
+        gprof_data = gprof_data[{"scans": scans}]
+
+        x = scene.x_coords
+        y = scene.y_coords
+        x, y = xr.broadcast(x, y)
+        x = x.transpose("y", "x")
+        y = y.transpose("y", "x")
+        lons_val, lats_val = BRAZIL.get_lonlat_from_projection_coordinates(x, y)
+
+        lats_gprof = gprof_data.latitude.data
+        lons_gprof = gprof_data.longitude.data
+        sp_gprof = gprof_data.surface_precipitation.data
+        sp_gprof[~(sp_gprof >= 0)] = np.nan
+
+        gprof_swath = SwathDefinition(lons=lons_gprof, lats=lats_gprof)
+        validation_swath = SwathDefinition(lons=lons_val, lats=lats_val)
+        sp_r = resample_nearest(gprof_swath,
+                                sp_gprof,
+                                validation_swath,
+                                radius_of_influence=15e3,
+                                fill_value=np.nan)
+        validation_data.surface_precip_gprof.data[i] = sp_r
