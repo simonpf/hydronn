@@ -8,7 +8,6 @@ Various utility functions.
 import io
 import gzip
 
-import cartopy.crs as ccrs
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm, Normalize
 from matplotlib.patches import Rectangle
@@ -243,6 +242,7 @@ def scale_bar(
             object.
         linewidth: The width of the line.
     """
+    import cartopy.crs as ccrs
     lon_min, lon_max, lat_min, lat_max = ax.get_extent(ccrs.PlateCarree())
 
     lon_c = lon_min + (lon_max - lon_min) * location[0]

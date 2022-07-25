@@ -748,10 +748,11 @@ class Evaluator:
         input_data = HydronnDataset(
             input_file,
             normalizer=self.normalizer,
-            batch_size=1,
+            batch_size=32,
             resolution=self.resolution,
             shuffle=False,
-            ir=self.ir
+            ir=self.ir,
+            augment=False
         )
         tau = [
             0.01,

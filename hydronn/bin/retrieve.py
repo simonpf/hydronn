@@ -218,7 +218,7 @@ def run(args):
 
     queue = Queue()
     pool = ProcessPoolExecutor(
-        max_workers=4, initializer=pool_init, initargs=(queue,)
+        max_workers=2, initializer=pool_init, initargs=(queue,)
     )
 
     tasks = []
