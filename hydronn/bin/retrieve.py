@@ -10,6 +10,7 @@ from calendar import monthrange
 from concurrent.futures import ProcessPoolExecutor
 from datetime import (datetime, timedelta)
 import logging
+import multiprocessing as mp
 from multiprocessing import Queue, Manager, Process, Lock
 import os
 from pathlib import Path
@@ -20,6 +21,7 @@ from tempfile import TemporaryDirectory, mkdtemp
 import gc
 
 from rich.progress import track
+import torch
 import xarray as xr
 
 
@@ -78,77 +80,60 @@ def add_parser(subparsers):
 
     parser.set_defaults(func=run)
 
-
-def load_file(queue, input_file, normalizer, output_file):
-    """
-    Helper function for parallel loading of input data.
-
-    Args:
-        queue: Queue to put input data on.
-        input_file: Name of the retrieval input file.
-        normalizer: Normalizer object to use to normalize the input data.
-        output_file: File to write the output to.
-    """
-    from hydronn.retrieval import InputFile
-    queue.put((
-        InputFile(input_file, normalizer, batch_size=6),
-        output_file
-    ))
-
-
-def loader(task_queue, input_queue):
-    from hydronn.retrieval import InputFile
-    while task_queue.qsize():
-        input_file, normalizer, output_file = task_queue.get()
-        print(f"Loading {input_file}.")
-        input_queue.put((
-            InputFile(input_file, normalizer, batch_size=6),
-            output_file
-        ))
-        print(f"Loaded {input_file}.")
-
-
-_QUEUE = None
-def pool_init(queue):
-    global _QUEUE
-    _QUEUE = queue
-
 def process_file(
         model,
         input_file,
         output_file,
         tile_size,
         overlap,
-        device,
+        device_queue,
         correction):
-        from hydronn.retrieval import Retrieval, InputFile
-        from hydronn.utils import save_and_compress
-        from quantnn.qrnn import QRNN
-        import torch
-        model = QRNN.load(model)
-        normalizer = model.normalizer
-        retrieval = Retrieval([InputFile(input_file, normalizer)],
-                              model,
-                              normalizer,
-                              tile_size=tile_size,
-                              overlap=overlap,
-                              device=device,
-                              correction=correction)
-        while _QUEUE.qsize() > 1:
-            pass
-        _QUEUE.put(1)
-        try:
-            results = retrieval.run()
-            del retrieval
-            model.model.cpu()
-            gc.collect()
-        finally:
-            _QUEUE.get()
-        if not output_file.parent.exists():
-            output_file.parent.mkdir(parents=True)
-        if str(output_file).endswith(".gz"):
-            output_file = str(output_file)[:-3]
-        save_and_compress(results, output_file)
+    """
+    Process an input file containing one hour of input observations.
+
+    Args:
+        model: Path to the Hydronn model to use for the processing.
+        input_file: The file to process.
+        output_file: The file to which to write the results.
+        tile_size: The tile size to use for processing.
+        overlap: The overlap to use for the tiling.
+        device_queue: Queue with available devices.
+        correction: Path to the correction file to apply.
+    """
+    from hydronn.retrieval import Retrieval, InputFile
+    from hydronn.utils import save_and_compress
+    from quantnn.qrnn import QRNN
+    import torch
+    model = QRNN.load(model)
+    normalizer = model.normalizer
+    retrieval = Retrieval([InputFile(input_file, normalizer)],
+                            model,
+                            normalizer,
+                            tile_size=tile_size,
+                            overlap=overlap,
+                            device="cpu",
+                            correction=correction)
+
+    print("Waiting for device")
+    device = device_queue.get()
+    try:
+        LOGGER.info(
+            "Starting processing of file '%s' on device '%s'.",
+            input_file,
+            device
+        )
+        retrieval.device = device
+        results = retrieval.run()
+        del retrieval
+        model.model.cpu()
+        gc.collect()
+    finally:
+        device_queue.put(device)
+    if not output_file.parent.exists():
+        output_file.parent.mkdir(parents=True)
+    if str(output_file).endswith(".gz"):
+        output_file = str(output_file)[:-3]
+    save_and_compress(results, output_file)
 
 
 def run(args):
@@ -163,6 +148,8 @@ def run(args):
     from hydronn.retrieval import Retrieval, InputFile
     from hydronn.utils import save_and_compress
 
+    mp.set_start_method("spawn", force=True)
+
     model = Path(args.model)
     if not model.exists():
         LOGGER.error("The model %s' does not exist.", model)
@@ -173,7 +160,7 @@ def run(args):
 
     output_path = Path(args.output_path)
     if not output_path.exists():
-        LOGGER.error("The output path '%s' does not exist.", input_path)
+        LOGGER.error("The output path '%s' does not exist.", output_path)
 
     input_files = []
     output_files = []
@@ -216,9 +203,20 @@ def run(args):
         )
         return 1
 
-    queue = Queue()
+    manager = mp.Manager()
+    queue = manager.Queue()
+    if device == "cuda":
+        for i in range(torch.cuda.device_count()):
+            queue.put(f"cuda:{i}")
+    else:
+        for i in range(4):
+            queue.put("cpu")
+
+    available_gpus = [
+        torch.cuda.device(i) for i in range(torch.cuda.device_count())
+    ]
     pool = ProcessPoolExecutor(
-        max_workers=4, initializer=pool_init, initargs=(queue,)
+        max_workers=4
     )
 
     tasks = []
@@ -228,7 +226,7 @@ def run(args):
             tasks.append(pool.submit(
                 process_file,
                 model,
-                input_file, output_file, tile_size, overlap, device,
+                input_file, output_file, tile_size, overlap, queue,
                 correction
             ))
         else:
@@ -236,26 +234,5 @@ def run(args):
 
     for task in tasks:
         task.result()
-
-    ## Go through input an process on device.
-    #for i in range(n_files):
-    #    print(f"Running retrieval {i}.")
-    #    retrieval = Retrieval([input_file],
-    #                          model,
-    #                          normalizer,
-    #                          tile_size=tile_size,
-    #                          overlap=overlap,
-    #                          device=device,
-    #                          correction=correction)
-    #    results = retrieval.run()
-
-    #    if not output_file.parent.exists():
-    #        output_file.parent.mkdir(parents=True)
-    #    if str(output_file).endswith(".gz"):
-    #        output_file = str(output_file)[:-3]
-    #    compress_pool.submit(save_and_compress, results, output_file)
-    #    print(f"Finished processing file '{output_file}'")
-
-    #compress_pool.shutdown(wait=True)
 
 
