@@ -123,8 +123,8 @@ class HydronnDataset:
             self.x_coords = data.x_
             self.y_coords = data.y_
         else:
-            self.x_coords = data.x_[:, ::2, ::2]
-            self.y_coords = data.y_[:, ::2, ::2]
+            self.x_coords = data.x_[:, ::2]
+            self.y_coords = data.y_[:, ::2]
 
         hi_res = data["C02"].data[:, np.newaxis].astype(np.float32)
         med_res = np.stack(
