@@ -400,10 +400,6 @@ class Tiler:
 
         return results
 
-
-
-
-
     def __repr__(self):
         return f"Tiler(tile_size={self.tile_size}, overlap={self.overlap})"
 
@@ -634,17 +630,13 @@ class Retrieval:
                     del y_pred_indep
 
         # Finally, concatenate over rows and columns.
-        sample_dep = np.concatenate([np.concatenate(r, -1) for r in sample_dep], -2)
-        quantiles_dep = np.concatenate(
-            [np.concatenate(r, -2) for r in quantiles_dep], -3
-        )
-        mean_dep = np.concatenate([np.concatenate(r, -1) for r in mean_dep], -2)
+        sample_dep = tile.assemble(sample_dep)
+        quantiles_dep = tiler.assembe(quantiles_dep)
+        mean_dep = tile.assembe(mean_dep)
 
-        sample_indep = np.concatenate([np.concatenate(r, -1) for r in sample_indep], -2)
-        quantiles_indep = np.concatenate(
-            [np.concatenate(r, -2) for r in quantiles_indep], -3
-        )
-        mean_indep = np.concatenate([np.concatenate(r, -1) for r in mean_indep], -2)
+        sample_indep = tiler.assemble(sample_indep)
+        quantiles_indep = tiler.assemble(quantiles_indep)
+        mean_indep = tiler.assemble(mean_indep)
 
         dims = ("time", "x", "y")
         dims_r = ("time", "x", "y")
@@ -669,23 +661,13 @@ class Retrieval:
 
         if self.correction:
             # Finally, concatenate over rows and columns.
-            sample_dep_c = np.concatenate(
-                [np.concatenate(r, -1) for r in sample_dep_c], -2
-            )
-            quantiles_dep_c = np.concatenate(
-                [np.concatenate(r, -2) for r in quantiles_dep_c], -3
-            )
-            mean_dep_c = np.concatenate([np.concatenate(r, -1) for r in mean_dep_c], -2)
+            sample_dep_c = tiler.assemble(sample_dep_c)
+            quantiles_dep_c = tiler.assemble(quantiles_dep_c)
+            mean_dep_c = tiler.assemble(mean_dep_c)
 
-            sample_indep_c = np.concatenate(
-                [np.concatenate(r, -1) for r in sample_indep_c], -2
-            )
-            quantiles_indep_c = np.concatenate(
-                [np.concatenate(r, -2) for r in quantiles_indep_c], -3
-            )
-            mean_indep_c = np.concatenate(
-                [np.concatenate(r, -1) for r in mean_indep_c], -2
-            )
+            sample_indep_c = tiler.assemble(sample_indep_c)
+            quantiles_indep_c = tiler.assemble(quantiles_indep_c)
+            mean_indep_c = tiler.assemble(mean_indep_c)
 
             results["mean_dep_c"] = (dims_r, mean_dep_c)
             results["sample_dep_c"] = (dims_r, sample_dep_c)
@@ -831,7 +813,6 @@ class Evaluator:
         for f in self.input_files:
             results.append(self._run_file(f))
         return xr.concat(results, "samples")
-
 
 
 def retrieve(model,
