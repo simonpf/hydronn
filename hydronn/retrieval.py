@@ -630,9 +630,9 @@ class Retrieval:
                     del y_pred_indep
 
         # Finally, concatenate over rows and columns.
-        sample_dep = tile.assemble(sample_dep)
+        sample_dep = tiler.assemble(sample_dep)
         quantiles_dep = tiler.assembe(quantiles_dep)
-        mean_dep = tile.assembe(mean_dep)
+        mean_dep = tiler.assembe(mean_dep)
 
         sample_indep = tiler.assemble(sample_indep)
         quantiles_indep = tiler.assemble(quantiles_indep)
