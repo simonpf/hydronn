@@ -486,6 +486,7 @@ class Retrieval:
 
         model = self.model.model.to(device)
 
+        print("Running file: ", input_file)
         x = input_data[0]
         tiler = Tiler(
             x,
@@ -532,7 +533,6 @@ class Retrieval:
                 with torch.no_grad():
                     # Retrieve tile
                     x_t = tiler.get_tile(i, j)
-                    slices = tiler.get_slices(i, j)
 
                     y_pred_dep = None
                     y_pred_indep = None
@@ -544,7 +544,7 @@ class Retrieval:
                     for k in range(x_t[0].shape[0]):
                         x_t_b = [t[[k]] for t in x_t]
                         x_t_b = [t.to(device) for t in x_t_b]
-                        y_pred = model(x_t_b)[(...,) + slices]
+                        y_pred = model(x_t_b)
                         y_pred = self.model._post_process_prediction(y_pred, bins)
 
                         if y_pred_dep is None:
