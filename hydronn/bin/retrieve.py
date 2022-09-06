@@ -8,7 +8,7 @@ retrieval.
 """
 from calendar import monthrange
 from concurrent.futures import ProcessPoolExecutor
-from datetime import (datetime, timedelta)
+from datetime import datetime, timedelta
 import logging
 import multiprocessing as mp
 from multiprocessing import Queue, Manager, Process, Lock
@@ -36,58 +36,70 @@ def add_parser(subparsers):
     Add parser for 'retrieve' command to top-level CLI.
     """
     parser = subparsers.add_parser(
-        'retrieve',
+        "retrieve",
         help="Run the hydronn retrieval",
-        description='Run the hydronn retrieval.'
+        description="Run the hydronn retrieval.",
     )
     parser.add_argument(
-        'model', metavar='model', type=str,
-        help='Path to the model to use for the retrieval.'
+        "model",
+        metavar="model",
+        type=str,
+        help="Path to the model to use for the retrieval.",
     )
     parser.add_argument(
-        'input_path', metavar='input_path', type=str,
-        help='Folder containing the retrieval input data.'
+        "input_path",
+        metavar="input_path",
+        type=str,
+        help="Folder containing the retrieval input data.",
     )
     parser.add_argument(
-        'output_path', metavar='output_path', type=str,
-        help='Where to store the retrieval output.'
+        "output_path",
+        metavar="output_path",
+        type=str,
+        help="Where to store the retrieval output.",
     )
     parser.add_argument(
-        '--device', metavar='device', type=str,
-        help='Device on which to run the retrieval.',
-        default="cuda"
+        "--device",
+        metavar="device",
+        type=str,
+        help="Device on which to run the retrieval.",
+        default="cuda",
     )
     parser.add_argument(
-        '--tile_size', metavar='N', type=int,
-        help='Size of the tiles that are processed simultaneously',
+        "--tile_size",
+        metavar="N",
+        type=int,
+        help="Size of the tiles that are processed simultaneously",
         nargs="+",
         default=[256],
     )
     parser.add_argument(
-        '--overlap', metavar='N', type=int,
-        help='Overlap between neighboring tiles',
-        default=32
+        "--overlap",
+        metavar="N",
+        type=int,
+        help="Overlap between neighboring tiles",
+        default=32,
     )
     parser.add_argument(
-        '--subset', metavar='even / odd', type=str,
-        help='Retrieve only even or odd days.'
+        "--subset",
+        metavar="even / odd",
+        type=str,
+        help="Retrieve only even or odd days.",
     )
     parser.add_argument(
-        '--correction', metavar='path', type=str,
-        help='Optional path to correction file to apply.',
-        default=None
+        "--correction",
+        metavar="path",
+        type=str,
+        help="Optional path to correction file to apply.",
+        default=None,
     )
 
     parser.set_defaults(func=run)
 
+
 def process_file(
-        model,
-        input_file,
-        output_file,
-        tile_size,
-        overlap,
-        device_queue,
-        correction):
+    model, input_file, output_file, tile_size, overlap, device_queue, correction
+):
     """
     Process an input file containing one hour of input observations.
 
@@ -104,31 +116,34 @@ def process_file(
     from hydronn.utils import save_and_compress
     from quantnn.qrnn import QRNN
     import torch
+
     model = QRNN.load(model)
     normalizer = model.normalizer
-    retrieval = Retrieval([InputFile(input_file, normalizer)],
-                            model,
-                            normalizer,
-                            tile_size=tile_size,
-                            overlap=overlap,
-                            device="cpu",
-                            correction=correction)
+    retrieval = Retrieval(
+        [InputFile(input_file, normalizer)],
+        model,
+        normalizer,
+        tile_size=tile_size,
+        overlap=overlap,
+        device="cpu",
+        correction=correction,
+    )
 
     print("Waiting for device")
     device = device_queue.get()
     try:
         LOGGER.info(
-            "Starting processing of file '%s' on device '%s'.",
-            input_file,
-            device
+            "Starting processing of file '%s' on device '%s'.", input_file, device
         )
         retrieval.device = device
         results = retrieval.run()
         del retrieval
         model.model.cpu()
         gc.collect()
+        torch.cuda.empty_cache()
     finally:
         device_queue.put(device)
+
     if not output_file.parent.exists():
         output_file.parent.mkdir(parents=True)
     if str(output_file).endswith(".gz"):
@@ -197,10 +212,7 @@ def run(args):
     device = args.device
     correction = args.correction
     if correction is not None and not Path(correction).exists():
-        LOGGER.error(
-            "The provided correction file '%s' doesn't exist.",
-            correction
-        )
+        LOGGER.error("The provided correction file '%s' doesn't exist.", correction)
         return 1
 
     manager = mp.Manager()
@@ -212,27 +224,27 @@ def run(args):
         for i in range(4):
             queue.put("cpu")
 
-    available_gpus = [
-        torch.cuda.device(i) for i in range(torch.cuda.device_count())
-    ]
-    pool = ProcessPoolExecutor(
-        max_workers=4
-    )
+    available_gpus = [torch.cuda.device(i) for i in range(torch.cuda.device_count())]
+    pool = ProcessPoolExecutor(max_workers=4)
 
     tasks = []
     for input_file, output_file in zip(input_files, output_files):
         output_compressed = Path(str(output_file) + ".gz")
         if not (output_file.exists() or output_compressed.exists()):
-            tasks.append(pool.submit(
-                process_file,
-                model,
-                input_file, output_file, tile_size, overlap, queue,
-                correction
-            ))
+            tasks.append(
+                pool.submit(
+                    process_file,
+                    model,
+                    input_file,
+                    output_file,
+                    tile_size,
+                    overlap,
+                    queue,
+                    correction,
+                )
+            )
         else:
             print(f"File '{output_file}' already exists. Skipping.")
 
     for task in tasks:
         task.result()
-
-

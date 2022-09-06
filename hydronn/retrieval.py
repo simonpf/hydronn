@@ -571,7 +571,6 @@ class Retrieval:
                         qd.posterior_quantiles(y_pred_dep, bins, quantiles)
                         .cpu()
                         .numpy()
-                        .transpose([0, 2, 3, 1])
                     )
                     mean_dep[-1].append(
                         qd.posterior_mean(y_pred_dep, bins).cpu().numpy()
@@ -584,7 +583,6 @@ class Retrieval:
                         qd.posterior_quantiles(y_pred_indep, bins, quantiles)
                         .cpu()
                         .numpy()
-                        .transpose([0, 2, 3, 1])
                     )
                     mean_indep[-1].append(
                         qd.posterior_mean(y_pred_indep, bins).cpu().numpy()
@@ -602,7 +600,6 @@ class Retrieval:
                             qd.posterior_quantiles(y_pred_dep_c, bins, quantiles)
                             .cpu()
                             .numpy()
-                            .transpose([0, 2, 3, 1])
                         )
                         mean_dep_c[-1].append(
                             qd.posterior_mean(y_pred_dep_c, bins).cpu().numpy()
@@ -618,7 +615,6 @@ class Retrieval:
                             qd.posterior_quantiles(y_pred_indep_c, bins, quantiles)
                             .cpu()
                             .numpy()
-                            .transpose([0, 2, 3, 1])
                         )
                         mean_indep_c[-1].append(
                             qd.posterior_mean(y_pred_indep_c, bins).cpu().numpy()
@@ -631,11 +627,11 @@ class Retrieval:
 
         # Finally, concatenate over rows and columns.
         sample_dep = tiler.assemble(sample_dep)
-        quantiles_dep = tiler.assembe(quantiles_dep)
-        mean_dep = tiler.assembe(mean_dep)
+        quantiles_dep = tiler.assemble(quantiles_dep).transpose([0, 2, 3, 1])
+        mean_dep = tiler.assemble(mean_dep)
 
         sample_indep = tiler.assemble(sample_indep)
-        quantiles_indep = tiler.assemble(quantiles_indep)
+        quantiles_indep = tiler.assemble(quantiles_indep).transpose([0, 2, 3, 1])
         mean_indep = tiler.assemble(mean_indep)
 
         dims = ("time", "x", "y")
@@ -662,11 +658,11 @@ class Retrieval:
         if self.correction:
             # Finally, concatenate over rows and columns.
             sample_dep_c = tiler.assemble(sample_dep_c)
-            quantiles_dep_c = tiler.assemble(quantiles_dep_c)
+            quantiles_dep_c = tiler.assemble(quantiles_dep_c).transpose([0, 2, 3, 1])
             mean_dep_c = tiler.assemble(mean_dep_c)
 
             sample_indep_c = tiler.assemble(sample_indep_c)
-            quantiles_indep_c = tiler.assemble(quantiles_indep_c)
+            quantiles_indep_c = tiler.assemble(quantiles_indep_c).transpose([0, 2, 3, 1])
             mean_indep_c = tiler.assemble(mean_indep_c)
 
             results["mean_dep_c"] = (dims_r, mean_dep_c)
