@@ -486,7 +486,6 @@ class Retrieval:
 
         model = self.model.model.to(device)
 
-        print("Running file: ", input_file)
         x = input_data[0]
         tiler = Tiler(
             x,
@@ -508,6 +507,9 @@ class Retrieval:
         sample_indep_c = []
         quantiles_indep_c = []
         mean_indep_c = []
+
+        any_invalid = False
+        any_ir_invalid = False
 
         for i in range(tiler.M):
 
@@ -543,6 +545,18 @@ class Retrieval:
 
                     for k in range(x_t[0].shape[0]):
                         x_t_b = [t[[k]] for t in x_t]
+
+                        # Check
+                        low_res, med_res, hi_res = x
+                        any_invalid += ~(
+                            np.any(np.isfinite(hi_res.numpy()), (-3, -2, -1)) +
+                            np.any(np.isfinite(med_res.numpy()), (-3, -2, -1)) +
+                            np.any(np.isfinite(low_res.numpy()), (-3, -2, -1))
+                        )
+                        any_ir_invalid += ~np.any(
+                            np.isfinite(low_res.numpy()[:, -4]), (-2, -1)
+                        )
+
                         x_t_b = [t.to(device) for t in x_t_b]
                         y_pred = model(x_t_b)
                         y_pred = self.model._post_process_prediction(y_pred, bins)
@@ -671,6 +685,9 @@ class Retrieval:
             results["mean_indep_c"] = (dims_r, mean_indep_c)
             results["sample_indep_c"] = (dims_r, sample_indep_c)
             results["quantiles_indep_c"] = (dims_r + ("quantiles",), quantiles_indep_c)
+
+        results.attrs["any_invalid"] = any_invalid
+        results.attrs["any_ir_invalid"] = any_ir_invalid
 
         return results
 
