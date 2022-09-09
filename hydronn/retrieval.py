@@ -549,12 +549,12 @@ class Retrieval:
                         # Check
                         low_res, med_res, hi_res = x
                         any_invalid += ~(
-                            np.any(np.isfinite(hi_res.numpy()), (-3, -2, -1)) +
-                            np.any(np.isfinite(med_res.numpy()), (-3, -2, -1)) +
-                            np.any(np.isfinite(low_res.numpy()), (-3, -2, -1))
+                            np.any(np.isfinite(hi_res.numpy())) +
+                            np.any(np.isfinite(med_res.numpy())) +
+                            np.any(np.isfinite(low_res.numpy()))
                         )
                         any_ir_invalid += ~np.any(
-                            np.isfinite(low_res.numpy()[:, -4]), (-2, -1)
+                            np.isfinite(low_res.numpy()[:, -4])
                         )
 
                         x_t_b = [t.to(device) for t in x_t_b]
@@ -686,8 +686,8 @@ class Retrieval:
             results["sample_indep_c"] = (dims_r, sample_indep_c)
             results["quantiles_indep_c"] = (dims_r + ("quantiles",), quantiles_indep_c)
 
-        results.attrs["any_invalid"] = any_invalid
-        results.attrs["any_ir_invalid"] = any_ir_invalid
+        results.attrs["any_invalid"] = int(any_invalid)
+        results.attrs["any_ir_invalid"] = int(any_ir_invalid)
 
         return results
 
