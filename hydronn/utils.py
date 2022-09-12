@@ -138,8 +138,6 @@ def plot_sample(x, y, n=3):
     x_hi = np.linspace(0, 256, 1025)
     y_hi = np.linspace(0, 256, 1025)
 
-    print(sp.shape)
-
     for i in range(0, n):
 
         precip_norm = LogNorm(1e-1, 1e2)
@@ -147,7 +145,6 @@ def plot_sample(x, y, n=3):
         levels = np.logspace(-1, 1, 5)
 
         axs[i, 0].pcolormesh(x, y, low_res[i, -1], cmap="Greys_r")
-        print(sp[i].max())
         try:
             axs[i, 0].contour(
                 x_c,
@@ -162,7 +159,6 @@ def plot_sample(x, y, n=3):
             pass
 
         axs[i, 1].pcolormesh(x, y, low_res[i, -4], cmap="Greys_r")
-        print(sp[i].max())
         try:
             axs[i, 0].contour(
                 x_c,
@@ -269,9 +265,6 @@ def scale_bar(
 
     left_ax = to_axes_coords([x_left, y_c])
     right_ax = to_axes_coords([x_right, y_c])
-
-    print("LEFT:  ", axes_to_lonlat(left_ax))
-    print("RIGHT: ", axes_to_lonlat(right_ax))
 
     l_ax = right_ax[0] - left_ax[0]
     l_part = l_ax / parts
